@@ -28,7 +28,12 @@ public class TransparentButton extends ButtonWidget {
 			final int color = (int) (255.0F * f);	
 
 			context.fill(getX(), getY(), getX() + getWidth(), getY() + getHeight(), color / 2 << 24);
-			context.drawCenteredTextWithShadow(mc.textRenderer, getMessage(), getX() + getWidth() / 2, getY() + (getHeight() - 8) / 2, 0xffffff);
+			String label = getMessage().getString();
+			int availableWidth = getWidth() - 8;
+			if (mc.textRenderer.getWidth(label) > availableWidth) {
+				label = mc.textRenderer.trimToWidth(label, availableWidth - mc.textRenderer.getWidth("...")) + "...";
+			}
+			context.drawCenteredTextWithShadow(mc.textRenderer, label, getX() + getWidth() / 2, getY() + (getHeight() - 8) / 2, 0xffffff);
 		}
 	}
 

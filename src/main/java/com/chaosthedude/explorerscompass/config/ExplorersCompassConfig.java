@@ -6,7 +6,9 @@ import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -36,6 +38,18 @@ public class ExplorersCompassConfig {
 	public static boolean translateStructureNames = true;
 	public static int overlayLineOffset = 1;
 	public static OverlaySide overlaySide = OverlaySide.LEFT;
+	public static List<String> sortOrder = defaultSortOrder();
+
+	private static List<String> defaultSortOrder() {
+		return new ArrayList<String>(Arrays.asList("NAME", "SOURCE", "DIMENSION", "GROUP"));
+	}
+
+	private static List<String> normalizeSortOrder(List<String> savedOrder) {
+		if (savedOrder == null || savedOrder.size() != 4 || !new HashSet<String>(savedOrder).equals(new HashSet<String>(defaultSortOrder()))) {
+			return defaultSortOrder();
+		}
+		return new ArrayList<String>(savedOrder);
+	}
 
 	public static void load() {
 		Reader reader;
@@ -59,6 +73,7 @@ public class ExplorersCompassConfig {
 				translateStructureNames = data.client.translateStructureNames;
 				overlayLineOffset = data.client.overlayLineOffset;
 				overlaySide = data.client.overlaySide;
+				sortOrder = normalizeSortOrder(data.client.sortOrder);
 
 				reader.close();
 			} catch (IOException e) {
@@ -71,7 +86,7 @@ public class ExplorersCompassConfig {
 	public static void save() {
 		try {
 			Writer writer = Files.newBufferedWriter(getFilePath());
-			Data data = new Data(new Data.Common(allowTeleport, maxNextSearches, displayCoordinates, maxRadius, maxSamples, compassDurability, defaultXpLevel, perStructureXpLevels, structureBlacklist), new Data.Client(displayWithChatOpen, translateStructureNames, overlayLineOffset, overlaySide));
+			Data data = new Data(new Data.Common(allowTeleport, maxNextSearches, displayCoordinates, maxRadius, maxSamples, compassDurability, defaultXpLevel, perStructureXpLevels, structureBlacklist), new Data.Client(displayWithChatOpen, translateStructureNames, overlayLineOffset, overlaySide, sortOrder));
 			gson.toJson(data, writer);
 			writer.close();
 		} catch (IOException e) {
@@ -161,19 +176,22 @@ public class ExplorersCompassConfig {
 
 			private final String overlaySideComment = "The side for information rendered on the HUD. Ex: LEFT, RIGHT";
 			private final OverlaySide overlaySide;
+			private final List<String> sortOrder;
 
 			private Client() {
 				displayWithChatOpen = true;
 				translateStructureNames = true;
 				overlayLineOffset = 1;
 				overlaySide = OverlaySide.LEFT;
+				sortOrder = defaultSortOrder();
 			}
 
-			private Client(boolean displayWithChatOpen, boolean translateStructureNames, int overlayLineOffset, OverlaySide overlaySide) {
+			private Client(boolean displayWithChatOpen, boolean translateStructureNames, int overlayLineOffset, OverlaySide overlaySide, List<String> sortOrder) {
 				this.displayWithChatOpen = displayWithChatOpen;
 				this.translateStructureNames = translateStructureNames;
 				this.overlayLineOffset = overlayLineOffset;
 				this.overlaySide = overlaySide;
+				this.sortOrder = normalizeSortOrder(sortOrder);
 			}
 		}
 	}
