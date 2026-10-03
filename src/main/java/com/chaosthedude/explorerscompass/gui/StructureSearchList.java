@@ -15,6 +15,8 @@ import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
 public class StructureSearchList extends AlwaysSelectedEntryListWidget<StructureSearchEntry> {
+	private static final int SCROLLBAR_WIDTH = 6;
+	private static final int SCROLLBAR_GRAB_PADDING = 2;
 
 	private final ExplorersCompassScreen parentScreen;
 	private final PlayerEntity player;
@@ -23,6 +25,8 @@ public class StructureSearchList extends AlwaysSelectedEntryListWidget<Structure
 		super(client, width, height, y, y + height, slotHeight);
 		this.parentScreen = parentScreen;
 		this.player = player;
+		// Cancel the list widget's default 4px top padding so rows meet the scrollbar track.
+		headerHeight = -4;
         setLeftPos(x);
 		refreshList(structureIdToSelect);
 	}
@@ -30,6 +34,38 @@ public class StructureSearchList extends AlwaysSelectedEntryListWidget<Structure
 	@Override
 	protected int getScrollbarPositionX() {
 		return left + width;
+	}
+
+	@Override
+	public boolean isMouseOver(double mouseX, double mouseY) {
+		return super.isMouseOver(mouseX, mouseY)
+				|| getMaxScroll() > 0 && mouseX >= getScrollbarPositionX() && mouseX < getScrollbarPositionX() + SCROLLBAR_WIDTH
+						&& mouseY >= top && mouseY <= bottom;
+	}
+
+	private int getScrollbarThumbHeight() {
+		int viewportHeight = bottom - top;
+		return MathHelper.clamp((int) ((float) (viewportHeight * viewportHeight) / getMaxPosition()), 32, viewportHeight - 8);
+	}
+
+	private int getScrollbarThumbTop() {
+		int travel = bottom - top - getScrollbarThumbHeight();
+		return top + (int) (getScrollAmount() * travel / getMaxScroll());
+	}
+
+	@Override
+	public boolean mouseClicked(double mouseX, double mouseY, int button) {
+		boolean handled = super.mouseClicked(mouseX, mouseY, button);
+		if (handled && button == 0 && getMaxScroll() > 0
+				&& mouseX >= getScrollbarPositionX() && mouseX < getScrollbarPositionX() + SCROLLBAR_WIDTH) {
+			int thumbTop = getScrollbarThumbTop();
+			int thumbHeight = getScrollbarThumbHeight();
+			if (mouseY < thumbTop - SCROLLBAR_GRAB_PADDING || mouseY >= thumbTop + thumbHeight + SCROLLBAR_GRAB_PADDING) {
+				int travel = bottom - top - thumbHeight;
+				setScrollAmount((mouseY - top - thumbHeight / 2.0) * getMaxScroll() / travel);
+			}
+		}
+		return handled;
 	}
 
 	@Override
@@ -67,13 +103,9 @@ public class StructureSearchList extends AlwaysSelectedEntryListWidget<Structure
         // Render scrollbar
         if (getMaxScroll() > 0) {
             int scrollbarLeft = getScrollbarPositionX();
-            int scrollbarRight = scrollbarLeft + 6;
-            int scrollbarHeight = (int) ((float) ((bottom - top) * (bottom - top)) / (float) getMaxPosition());
-            scrollbarHeight = MathHelper.clamp(scrollbarHeight, 32, bottom - top - 8);
-            int scrollbarTop = (int) getScrollAmount() * (bottom - top - scrollbarHeight) / getMaxScroll() + top;
-            if (scrollbarTop < top) {
-                scrollbarTop = top;
-            }
+            int scrollbarRight = scrollbarLeft + SCROLLBAR_WIDTH;
+            int scrollbarHeight = getScrollbarThumbHeight();
+            int scrollbarTop = getScrollbarThumbTop();
             context.fill(scrollbarLeft, top, scrollbarRight, bottom, RenderUtils.getBackgroundColor(false, false));
             context.fill(scrollbarLeft, scrollbarTop, scrollbarRight, scrollbarTop + scrollbarHeight, RenderUtils.getBackgroundColor(true, true));
         }
