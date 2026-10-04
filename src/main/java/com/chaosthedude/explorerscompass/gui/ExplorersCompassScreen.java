@@ -51,7 +51,7 @@ public class ExplorersCompassScreen extends Screen {
 	private static final int FILTER_SECTION_GAP = 1;
 	private static final int FILTER_CHECKBOX_SIZE = 9;
 	private static final int BUTTON_CROSS_SIZE = 7;
-	private static final int FILTER_SCROLLBAR_WIDTH = 6;
+	private static final int SCROLLBAR_WIDTH = 6;
 	private static final int FILTER_SCROLLBAR_GRAB_PADDING = 2;
 	private static final int SETTINGS_ROW_HEIGHT = 30;
 	private static final int SETTINGS_CONTROL_WIDTH = 90;
@@ -94,7 +94,7 @@ public class ExplorersCompassScreen extends Screen {
 	private StructureSearchList selectionList;
 	private boolean filtersOpen;
 	private boolean settingsOpen;
-	private int filterScroll;
+	private double filterScroll;
 	private boolean draggingFilterScrollbar;
 	private double filterScrollbarGrabOffset;
 	private final List<List<FilterOption>> filterOptions = List.of(new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
@@ -157,7 +157,7 @@ public class ExplorersCompassScreen extends Screen {
 		}
 		if (filtersOpen) {
 			if (scroll1 >= filterLeft() && scroll1 < filterScrollbarRight() && scroll2 >= filterTop() && scroll2 < filterBottom()) {
-				filterScroll = MathHelper.clamp(filterScroll - (int) Math.signum(scroll3) * FILTER_ROW_HEIGHT, 0, filterMaxScroll());
+				filterScroll = MathHelper.clamp(filterScroll - scroll3 * FILTER_ROW_HEIGHT, 0, filterMaxScroll());
 				return true;
 			}
 			return super.mouseScrolled(scroll1, scroll2, scroll3);
@@ -172,7 +172,7 @@ public class ExplorersCompassScreen extends Screen {
 	protected void init() {
 		clearChildren();
 		setupButtons();
-		selectionList = new StructureSearchList(this, client, player, foundStructureId, 130, 40, width - 140, height - 50, 50);
+		selectionList = new StructureSearchList(this, client, player, foundStructureId, 130, 40, width - 130 - SCROLLBAR_WIDTH, height - 50, 50);
 		if (isStructureView()) {
 			addDrawableChild(selectionList);
 		}
@@ -200,7 +200,7 @@ public class ExplorersCompassScreen extends Screen {
 			remove(selectionList);
 			allowedStructureIDs = new ArrayList<Identifier>(ExplorersCompass.allowedStructureIDs);
 			structureIDsMatchingSearch = new ArrayList<Identifier>(allowedStructureIDs);
-			selectionList = new StructureSearchList(this, client, player, foundStructureId, 130, 40, width - 140, height - 50, 50);
+			selectionList = new StructureSearchList(this, client, player, foundStructureId, 130, 40, width - 130 - SCROLLBAR_WIDTH, height - 50, 50);
 			if (isStructureView()) {
 				addDrawableChild(selectionList);
 			}
@@ -331,11 +331,11 @@ public class ExplorersCompassScreen extends Screen {
 	}
 
 	private int filterRight() {
-		return width - 10;
+		return width - SCROLLBAR_WIDTH;
 	}
 
 	private int filterScrollbarRight() {
-		return filterRight() + FILTER_SCROLLBAR_WIDTH;
+		return filterRight() + SCROLLBAR_WIDTH;
 	}
 
 	private int filterTop() {
@@ -414,12 +414,16 @@ public class ExplorersCompassScreen extends Screen {
 	}
 
 	private int filterRowY(int index, int sectionStart) {
-		return filterRowsTop() + index * FILTER_ROW_HEIGHT - filterScroll
+		return filterRowsTop() + index * FILTER_ROW_HEIGHT - visibleFilterScroll()
 				+ (sectionStart >= 0 && index >= sectionStart ? FILTER_SECTION_GAP : 0);
 	}
 
+	private int visibleFilterScroll() {
+		return (int) Math.floor(filterScroll);
+	}
+
 	private int filterOptionIndexAt(double mouseY, List<FilterOption> options, int sectionStart) {
-		double offset = mouseY - filterRowsTop() + filterScroll;
+		double offset = mouseY - filterRowsTop() + visibleFilterScroll();
 		if (sectionStart >= 0) {
 			int gapStart = sectionStart * FILTER_ROW_HEIGHT;
 			if (offset >= gapStart && offset < gapStart + FILTER_SECTION_GAP) {
@@ -450,7 +454,7 @@ public class ExplorersCompassScreen extends Screen {
 	}
 
 	private int filterThumbTop() {
-		return filterTop() + filterScroll * (filterBottom() - filterTop() - filterThumbHeight()) / filterMaxScroll();
+		return filterTop() + (int) (filterScroll * (filterBottom() - filterTop() - filterThumbHeight()) / filterMaxScroll());
 	}
 
 	private void rebuildFilterOptions() {
@@ -636,7 +640,7 @@ public class ExplorersCompassScreen extends Screen {
 			List<FilterOption> options = visibleFilterOptions(column);
 			int sectionStart = filterSectionStart(column, options);
 			if (sectionStart >= 0) {
-				int gapY = filterRowsTop() + sectionStart * FILTER_ROW_HEIGHT - filterScroll;
+				int gapY = filterRowsTop() + sectionStart * FILTER_ROW_HEIGHT - visibleFilterScroll();
 				context.fill(columnLeft, filterRowsTop(), columnRight, MathHelper.clamp(gapY, filterRowsTop(), bottom), 0xb0000000);
 				context.fill(columnLeft, MathHelper.clamp(gapY + FILTER_SECTION_GAP, filterRowsTop(), bottom), columnRight, bottom, 0xb0000000);
 			} else {
@@ -837,7 +841,7 @@ public class ExplorersCompassScreen extends Screen {
 			return;
 		}
 		int travel = filterBottom() - filterTop() - filterThumbHeight();
-		filterScroll = MathHelper.clamp((int) ((mouseY - filterTop() - filterScrollbarGrabOffset) * maxScroll / travel), 0, maxScroll);
+		filterScroll = MathHelper.clamp((mouseY - filterTop() - filterScrollbarGrabOffset) * maxScroll / travel, 0, maxScroll);
 	}
 
 	private void setFiltersOpen(boolean open) {

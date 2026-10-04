@@ -43,6 +43,12 @@ public class StructureSearchList extends AlwaysSelectedEntryListWidget<Structure
 						&& mouseY >= top && mouseY <= bottom;
 	}
 
+	@Override
+	public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
+		setScrollAmount(getScrollAmount() - amount * itemHeight);
+		return true;
+	}
+
 	private int getScrollbarThumbHeight() {
 		int viewportHeight = bottom - top;
 		return MathHelper.clamp((int) ((float) (viewportHeight * viewportHeight) / getMaxPosition()), 32, viewportHeight - 8);
