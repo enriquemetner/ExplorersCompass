@@ -35,6 +35,8 @@ public class ExplorersCompassConfig {
 	public static List<String> structureBlacklist = new ArrayList<String>();
 
 	public static boolean displayWithChatOpen = true;
+	public static boolean pauseGameWhenOpen = false;
+	public static boolean clearFiltersOnClose = true;
 	public static boolean translateStructureNames = true;
 	public static int overlayLineOffset = 1;
 	public static OverlaySide overlaySide = OverlaySide.LEFT;
@@ -70,6 +72,8 @@ public class ExplorersCompassConfig {
 				structureBlacklist = data.common.structureBlacklist;
 
 				displayWithChatOpen = data.client.displayWithChatOpen;
+				pauseGameWhenOpen = data.client.pauseGameWhenOpen;
+				clearFiltersOnClose = data.client.clearFiltersOnClose == null || data.client.clearFiltersOnClose;
 				translateStructureNames = data.client.translateStructureNames;
 				overlayLineOffset = data.client.overlayLineOffset;
 				overlaySide = data.client.overlaySide;
@@ -86,7 +90,7 @@ public class ExplorersCompassConfig {
 	public static void save() {
 		try {
 			Writer writer = Files.newBufferedWriter(getFilePath());
-			Data data = new Data(new Data.Common(allowTeleport, maxNextSearches, displayCoordinates, maxRadius, maxSamples, compassDurability, defaultXpLevel, perStructureXpLevels, structureBlacklist), new Data.Client(displayWithChatOpen, translateStructureNames, overlayLineOffset, overlaySide, sortOrder));
+			Data data = new Data(new Data.Common(allowTeleport, maxNextSearches, displayCoordinates, maxRadius, maxSamples, compassDurability, defaultXpLevel, perStructureXpLevels, structureBlacklist), new Data.Client(displayWithChatOpen, pauseGameWhenOpen, clearFiltersOnClose, translateStructureNames, overlayLineOffset, overlaySide, sortOrder));
 			gson.toJson(data, writer);
 			writer.close();
 		} catch (IOException e) {
@@ -167,6 +171,10 @@ public class ExplorersCompassConfig {
 		private static class Client {
 			private final String displayWithChatOpenComment = "Displays compass information even while chat is open.";
 			private final boolean displayWithChatOpen;
+			private final String pauseGameWhenOpenComment = "Pauses the game in single-player while the compass screen is open.";
+			private final boolean pauseGameWhenOpen;
+			private final String clearFiltersOnCloseComment = "Clears selected structure filters when the compass screen closes.";
+			private final Boolean clearFiltersOnClose;
 
 			private final String translateStructureNamesComment = "Attempts to translate structure names before fixing the unlocalized names. Translations may not be available for all structures.";
 			private final boolean translateStructureNames;
@@ -180,14 +188,18 @@ public class ExplorersCompassConfig {
 
 			private Client() {
 				displayWithChatOpen = true;
+				pauseGameWhenOpen = false;
+				clearFiltersOnClose = true;
 				translateStructureNames = true;
 				overlayLineOffset = 1;
 				overlaySide = OverlaySide.LEFT;
 				sortOrder = defaultSortOrder();
 			}
 
-			private Client(boolean displayWithChatOpen, boolean translateStructureNames, int overlayLineOffset, OverlaySide overlaySide, List<String> sortOrder) {
+			private Client(boolean displayWithChatOpen, boolean pauseGameWhenOpen, boolean clearFiltersOnClose, boolean translateStructureNames, int overlayLineOffset, OverlaySide overlaySide, List<String> sortOrder) {
 				this.displayWithChatOpen = displayWithChatOpen;
+				this.pauseGameWhenOpen = pauseGameWhenOpen;
+				this.clearFiltersOnClose = clearFiltersOnClose;
 				this.translateStructureNames = translateStructureNames;
 				this.overlayLineOffset = overlayLineOffset;
 				this.overlaySide = overlaySide;
