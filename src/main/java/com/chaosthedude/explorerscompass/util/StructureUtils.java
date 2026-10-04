@@ -217,7 +217,7 @@ public class StructureUtils {
 	}
 
 	@Environment(EnvType.CLIENT)
-	private static String getDimensionName(Identifier dimensionKey) {
+	public static String getDimensionName(Identifier dimensionKey) {
 		String name = I18n.translate(Util.createTranslationKey("dimension", dimensionKey));
 		if (name.equals(Util.createTranslationKey("dimension", dimensionKey))) {
 			name = dimensionKey.toString();

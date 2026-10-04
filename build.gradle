@@ -33,6 +33,16 @@ dependencies {
 	// modImplementation "net.fabricmc.fabric-api:fabric-api-deprecated:${project.fabric_version}"
 }
 
+loom {
+	runs {
+		clientClean {
+			inherit client
+			runDir "run-clean"
+			configName = "Minecraft Client (Clean)"
+		}
+	}
+}
+
 processResources {
 	inputs.property "version", project.version
 

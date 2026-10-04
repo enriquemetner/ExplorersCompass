@@ -1,7 +1,13 @@
 package com.chaosthedude.explorerscompass.gui;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 import com.chaosthedude.explorerscompass.ExplorersCompass;
@@ -12,6 +18,7 @@ import com.chaosthedude.explorerscompass.network.SearchPacket;
 import com.chaosthedude.explorerscompass.network.TeleportPacket;
 import com.chaosthedude.explorerscompass.sorting.SortCriterion;
 import com.chaosthedude.explorerscompass.util.CompassState;
+import com.chaosthedude.explorerscompass.util.RenderUtils;
 import com.chaosthedude.explorerscompass.util.StructureUtils;
 
 import net.fabricmc.api.EnvType;
@@ -23,6 +30,7 @@ import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.world.World;
@@ -33,6 +41,14 @@ public class ExplorersCompassScreen extends Screen {
 	private static final int SORT_ROW_HEIGHT = 20;
 	private static final int SEARCH_FIELD_WIDTH = 210;
 	private static final int SEARCH_TELEPORT_GAP = 10;
+	private static final int FILTER_ROW_HEIGHT = 20;
+	private static final int FILTER_HEADER_HEIGHT = 20;
+	private static final int FILTER_HEADER_GAP = 1;
+	private static final int FILTER_COLUMN_GAP = 1;
+	private static final int FILTER_CHECKBOX_SIZE = 9;
+	private static final int BUTTON_CROSS_SIZE = 7;
+	private static final int FILTER_SCROLLBAR_WIDTH = 6;
+	private static final int FILTER_SCROLLBAR_GRAB_PADDING = 2;
 
 	private World world;
 	private PlayerEntity player;
@@ -45,14 +61,39 @@ public class ExplorersCompassScreen extends Screen {
 	private ButtonWidget searchForNextButton;
 	private ButtonWidget searchForGroupButton;
 	private ButtonWidget sortOrderButton;
+	private ButtonWidget filtersButton;
+	private ButtonWidget clearFiltersButton;
+	private ButtonWidget clearFiltersTopButton;
+	private ButtonWidget backButton;
 	private ButtonWidget teleportButton;
 	private ButtonWidget cancelButton;
 	private TransparentTextField searchTextField;
+	private TransparentTextField filterSearchTextField;
 	private StructureSearchList selectionList;
+	private boolean filtersOpen;
+	private int filterScroll;
+	private boolean draggingFilterScrollbar;
+	private double filterScrollbarGrabOffset;
+	private final List<List<FilterOption>> filterOptions = List.of(new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
+	private boolean showSourceColumn = true;
 	private final List<SortCriterion> sortOrder = new ArrayList<SortCriterion>();
 	private boolean sortMenuOpen;
 	private int draggedSortRow = -1;
 	private boolean sortOrderChangedDuringDrag;
+
+	private static class FilterOption {
+		private final String label;
+		private final String source;
+		private final Identifier id;
+		private final boolean current;
+
+		private FilterOption(String label, String source, Identifier id, boolean current) {
+			this.label = label;
+			this.source = source;
+			this.id = id;
+			this.current = current;
+		}
+	}
 
 	public ExplorersCompassScreen(World world, PlayerEntity player, ItemStack stack, ExplorersCompassItem explorersCompass, List<Identifier> allowedStructureIDs) {
 		super(Text.translatable("string.explorerscompass.selectStructure"));
@@ -60,6 +101,7 @@ public class ExplorersCompassScreen extends Screen {
 		this.player = player;
 		this.stack = stack;
 		this.explorersCompass = explorersCompass;
+		FilterSelections.openedInDimension(world.getRegistryKey().getValue());
 
 		this.allowedStructureIDs = new ArrayList<Identifier>(allowedStructureIDs);
 		structureIDsMatchingSearch = new ArrayList<Identifier>(allowedStructureIDs);
@@ -74,6 +116,13 @@ public class ExplorersCompassScreen extends Screen {
 
 	@Override
 	public boolean mouseScrolled(double scroll1, double scroll2, double scroll3) {
+		if (filtersOpen) {
+			if (scroll1 >= filterLeft() && scroll1 < filterScrollbarRight() && scroll2 >= filterTop() && scroll2 < filterBottom()) {
+				filterScroll = MathHelper.clamp(filterScroll - (int) Math.signum(scroll3) * FILTER_ROW_HEIGHT, 0, filterMaxScroll());
+				return true;
+			}
+			return super.mouseScrolled(scroll1, scroll2, scroll3);
+		}
 		if (sortMenuOpen && sortRowAt(scroll1, scroll2) >= 0) {
 			return true;
 		}
@@ -85,21 +134,27 @@ public class ExplorersCompassScreen extends Screen {
 		clearChildren();
 		setupButtons();
 		selectionList = new StructureSearchList(this, client, player, foundStructureId, 130, 40, width - 140, height - 50, 50);
-		addDrawableChild(selectionList);
+		if (!filtersOpen) {
+			addDrawableChild(selectionList);
+		}
 		setupTextFields();
+		rebuildFilterOptions();
+		processSearchTerm();
 	}
 
 	@Override
 	public void tick() {
 		searchTextField.tick();
+		filterSearchTextField.tick();
 
 		boolean hasSelection = selectionList.hasSelection();
 		boolean selectionMatchesFound = hasSelection && foundStructureId != null && selectionList.getSelectedOrNull().getStructureID().equals(foundStructureId);
 
-		searchButton.active = hasSelection;
-		searchForGroupButton.active = hasSelection;
-		searchForNextButton.active = selectionMatchesFound;
-		teleportButton.active = selectionMatchesFound;
+		searchButton.active = !filtersOpen && hasSelection;
+		searchForGroupButton.active = !filtersOpen && hasSelection;
+		searchForNextButton.active = !filtersOpen && selectionMatchesFound;
+		teleportButton.active = !filtersOpen && selectionMatchesFound;
+		sortOrderButton.active = !filtersOpen;
 
 		// Check if the allowed structure list has synced
 		if (ExplorersCompass.synced) {
@@ -107,9 +162,11 @@ public class ExplorersCompassScreen extends Screen {
 			allowedStructureIDs = new ArrayList<Identifier>(ExplorersCompass.allowedStructureIDs);
 			structureIDsMatchingSearch = new ArrayList<Identifier>(allowedStructureIDs);
 			selectionList = new StructureSearchList(this, client, player, foundStructureId, 130, 40, width - 140, height - 50, 50);
-			addDrawableChild(selectionList);
+			if (!filtersOpen) {
+				addDrawableChild(selectionList);
+			}
 
-			teleportButton.visible = ExplorersCompass.canTeleport;
+			teleportButton.visible = !filtersOpen && ExplorersCompass.canTeleport;
 			searchForNextButton.visible = ExplorersCompass.maxNextSearches > 0;
 			if (searchForNextButton.visible) {
 				sortOrderButton.setX(10);
@@ -118,6 +175,11 @@ public class ExplorersCompassScreen extends Screen {
 				sortOrderButton.setX(10);
 				sortOrderButton.setY(90);
 			}
+			positionFilterButtons();
+			positionTopButtons();
+			updateViewButtons();
+			rebuildFilterOptions();
+			processSearchTerm();
 
 			ExplorersCompass.synced = false;
 		}
@@ -126,14 +188,28 @@ public class ExplorersCompassScreen extends Screen {
 	@Override
 	public void render(DrawContext context, int mouseX, int mouseY, float partialTicks) {
         renderBackground(context);
+		if (filtersOpen) {
+			renderFilterPanel(context, mouseX, mouseY);
+		}
 		super.render(context, mouseX, mouseY, partialTicks);
+		renderCrossIcon(context, cancelButton);
+		if (clearFiltersButton.visible) {
+			renderCrossIcon(context, clearFiltersButton);
+		}
+		if (filtersOpen) {
+			renderFilterTooltip(context, mouseX, mouseY);
+		}
 		if (sortMenuOpen) {
 			context.getMatrices().push();
 			context.getMatrices().translate(0, 0, 200);
 			renderSortMenu(context, mouseX, mouseY);
 			context.getMatrices().pop();
 		}
-        context.drawCenteredTextWithShadow(textRenderer, title, 65, 15, 0xffffff);
+		if (filtersOpen) {
+			context.drawTextWithShadow(textRenderer, Text.translatable("string.explorerscompass.filters"), 10, 15, 0xffffff);
+		} else {
+			context.drawCenteredTextWithShadow(textRenderer, title, 65, 15, 0xffffff);
+		}
 	}
 
 	private int sortMenuWidth() {
@@ -204,8 +280,290 @@ public class ExplorersCompassScreen extends Screen {
 		context.fill(x + 2, y + 6, x + 3, y + 7, color);
 	}
 
+	private int filterLeft() {
+		return 10;
+	}
+
+	private int filterRight() {
+		return width - 10;
+	}
+
+	private int filterScrollbarRight() {
+		return filterRight() + FILTER_SCROLLBAR_WIDTH;
+	}
+
+	private int filterTop() {
+		return 40;
+	}
+
+	private int filterHeaderTop() {
+		return filterTop();
+	}
+
+	private int filterRowsTop() {
+		return filterHeaderTop() + FILTER_HEADER_HEIGHT + FILTER_HEADER_GAP;
+	}
+
+	private int filterBottom() {
+		return height - 10;
+	}
+
+	private int filterColumnLeft(int column) {
+		int firstColumn = showSourceColumn ? 0 : 1;
+		int columnCount = showSourceColumn ? 3 : 2;
+		return filterLeft() + (filterRight() - filterLeft()) * (column - firstColumn) / columnCount;
+	}
+
+	private int filterColumnRight(int column) {
+		int firstColumn = showSourceColumn ? 0 : 1;
+		int columnCount = showSourceColumn ? 3 : 2;
+		int edge = filterLeft() + (filterRight() - filterLeft()) * (column - firstColumn + 1) / columnCount;
+		return column == 2 ? edge : edge - FILTER_COLUMN_GAP;
+	}
+
+	private int filterColumnAt(double mouseX, double mouseY) {
+		if (mouseX < filterLeft() || mouseX >= filterRight() || mouseY < filterHeaderTop() || mouseY >= filterBottom()) {
+			return -1;
+		}
+		for (int column = showSourceColumn ? 0 : 1; column < 3; column++) {
+			if (mouseX >= filterColumnLeft(column) && mouseX < filterColumnRight(column)) {
+				return column;
+			}
+		}
+		return -1;
+	}
+
+	private List<FilterOption> visibleFilterOptions(int column) {
+		String query = filterSearchTextField.getText().toLowerCase(Locale.ROOT);
+		if (query.isEmpty()) {
+			return filterOptions.get(column);
+		}
+		return filterOptions.get(column).stream().filter(option -> option.label.toLowerCase(Locale.ROOT).contains(query)).collect(Collectors.toList());
+	}
+
+	private int filterMaxScroll() {
+		int longestColumn = 0;
+		for (int column = showSourceColumn ? 0 : 1; column < 3; column++) {
+			longestColumn = Math.max(longestColumn, visibleFilterOptions(column).size());
+		}
+		return Math.max(0, longestColumn * FILTER_ROW_HEIGHT - Math.max(0, filterBottom() - filterRowsTop()));
+	}
+
+	private int filterThumbHeight() {
+		int viewport = filterBottom() - filterTop();
+		return MathHelper.clamp(viewport * viewport / (viewport + filterMaxScroll()), 32, viewport - 8);
+	}
+
+	private int filterThumbTop() {
+		return filterTop() + filterScroll * (filterBottom() - filterTop() - filterThumbHeight()) / filterMaxScroll();
+	}
+
+	private void rebuildFilterOptions() {
+		for (List<FilterOption> options : filterOptions) {
+			options.clear();
+		}
+		Map<String, FilterOption> sources = new HashMap<>();
+		Set<Identifier> dimensions = new TreeSet<>();
+		Set<Identifier> groups = new TreeSet<>();
+		for (Identifier structure : allowedStructureIDs) {
+			String namespace = structure.getNamespace();
+			sources.putIfAbsent(namespace, new FilterOption(StructureUtils.getStructureSource(structure), namespace, null, false));
+			dimensions.addAll(ExplorersCompass.allowedStructureIDsToDimensionIDs.get(structure));
+			Identifier group = ExplorersCompass.structureIDsToGroupIDs.get(structure);
+			if (group != null) {
+				groups.add(group);
+			}
+		}
+		showSourceColumn = sources.size() != 1 || !sources.containsKey("minecraft");
+		if (!showSourceColumn) {
+			FilterSelections.sources.clear();
+		}
+		dimensions.add(world.getRegistryKey().getValue());
+		filterOptions.get(0).addAll(sources.values());
+		for (Identifier dimension : dimensions) {
+			filterOptions.get(1).add(new FilterOption(StructureUtils.getDimensionName(dimension), null, dimension, false));
+		}
+		for (Identifier group : groups) {
+			filterOptions.get(2).add(new FilterOption(StructureUtils.getStructureName(group), null, group, false));
+		}
+		Comparator<FilterOption> alphabetical = Comparator.comparing((FilterOption option) -> option.label.toLowerCase(Locale.ROOT))
+				.thenComparing(option -> option.source != null ? option.source : option.id.toString());
+		for (List<FilterOption> options : filterOptions) {
+			options.sort(alphabetical);
+		}
+		filterOptions.get(0).sort(Comparator.comparing((FilterOption option) -> !"minecraft".equals(option.source)).thenComparing(alphabetical));
+		filterOptions.get(1).add(0, new FilterOption(Text.translatable("string.explorerscompass.current").getString(), null, world.getRegistryKey().getValue(), true));
+		filterScroll = MathHelper.clamp(filterScroll, 0, filterMaxScroll());
+	}
+
+	private boolean filterChecked(int column, FilterOption option) {
+		if (option.current) {
+			return FilterSelections.isCurrentSelected();
+		}
+		return switch (column) {
+			case 0 -> FilterSelections.sources.contains(option.source);
+			case 1 -> FilterSelections.dimensions.contains(option.id);
+			default -> FilterSelections.groups.contains(option.id);
+		};
+	}
+
+	private void toggleFilter(int column, FilterOption option) {
+		if (column == 0) {
+			toggleSet(FilterSelections.sources, option.source);
+		} else if (column == 1) {
+			if (option.current) {
+				FilterSelections.toggleCurrent();
+			} else {
+				FilterSelections.toggleDimension(option.id);
+			}
+		} else {
+			toggleSet(FilterSelections.groups, option.id);
+		}
+		processSearchTerm();
+	}
+
+	private static <T> void toggleSet(Set<T> values, T value) {
+		if (!values.add(value)) {
+			values.remove(value);
+		}
+	}
+
+	private void drawFilterCheckbox(DrawContext context, int x, int y, boolean checked) {
+		context.fill(x, y, x + FILTER_CHECKBOX_SIZE, y + FILTER_CHECKBOX_SIZE, 0xffb0b0b0);
+		context.fill(x + 1, y + 1, x + FILTER_CHECKBOX_SIZE - 1, y + FILTER_CHECKBOX_SIZE - 1, 0xff161616);
+		if (checked) {
+			for (int pixel = 0; pixel < 5; pixel++) {
+				context.fill(x + 2 + pixel, y + 2 + pixel, x + 3 + pixel, y + 3 + pixel, 0xffffffff);
+				context.fill(x + 6 - pixel, y + 2 + pixel, x + 7 - pixel, y + 3 + pixel, 0xffffffff);
+			}
+		}
+	}
+
+	private void renderCrossIcon(DrawContext context, ButtonWidget button) {
+		context.getMatrices().push();
+		context.getMatrices().translate(
+				button.getX() + (button.getWidth() - BUTTON_CROSS_SIZE) / 2.0,
+				button.getY() + (button.getHeight() - BUTTON_CROSS_SIZE) / 2.0,
+				0.0);
+		for (int pixel = 0; pixel < BUTTON_CROSS_SIZE; pixel++) {
+			context.fill(pixel, pixel, pixel + 1, pixel + 1, 0xffffffff);
+			context.fill(BUTTON_CROSS_SIZE - 1 - pixel, pixel, BUTTON_CROSS_SIZE - pixel, pixel + 1, 0xffffffff);
+		}
+		context.getMatrices().pop();
+	}
+
+	private void renderFilterPanel(DrawContext context, int mouseX, int mouseY) {
+		int right = filterRight();
+		int bottom = filterBottom();
+		for (int column = showSourceColumn ? 0 : 1; column < 3; column++) {
+			int columnLeft = filterColumnLeft(column);
+			int columnRight = filterColumnRight(column);
+			context.fill(columnLeft, filterTop(), columnRight, filterRowsTop() - FILTER_HEADER_GAP, 0xb0000000);
+			context.fill(columnLeft, filterRowsTop(), columnRight, bottom, 0xb0000000);
+		}
+		String[] headings = {
+			Text.translatable("string.explorerscompass.source").getString(),
+			Text.translatable("string.explorerscompass.dimension").getString(),
+			Text.translatable("string.explorerscompass.group").getString()
+		};
+		for (int column = showSourceColumn ? 0 : 1; column < 3; column++) {
+			int columnLeft = filterColumnLeft(column);
+			int columnRight = filterColumnRight(column);
+			context.enableScissor(columnLeft + 2, filterHeaderTop() + 1, columnRight - 2, filterRowsTop() - FILTER_HEADER_GAP);
+			String heading = textRenderer.trimToWidth(headings[column], columnRight - columnLeft - 6);
+			context.drawCenteredTextWithShadow(textRenderer, heading, (columnLeft + columnRight) / 2, filterHeaderTop() + 6, 0xffffff);
+			context.disableScissor();
+			List<FilterOption> options = visibleFilterOptions(column);
+			context.enableScissor(columnLeft + 1, filterRowsTop(), columnRight - 1, bottom);
+			int checkboxX = columnRight - FILTER_CHECKBOX_SIZE - 7;
+			for (int index = 0; index < options.size(); index++) {
+				int rowY = filterRowsTop() + index * FILTER_ROW_HEIGHT - filterScroll;
+				if (rowY + FILTER_ROW_HEIGHT <= filterRowsTop() || rowY >= bottom) {
+					continue;
+				}
+				if (mouseX >= columnLeft && mouseX < columnRight && mouseY >= rowY && mouseY < rowY + FILTER_ROW_HEIGHT) {
+					context.fill(columnLeft + 1, rowY, columnRight - 1, rowY + FILTER_ROW_HEIGHT, 0x55242424);
+				}
+				FilterOption option = options.get(index);
+				drawFilterOptionLabel(context, option, columnLeft + 5, rowY, Math.max(0, checkboxX - columnLeft - 9));
+				drawFilterCheckbox(context, checkboxX, rowY + 5, filterChecked(column, option));
+			}
+			context.disableScissor();
+		}
+		if (filterMaxScroll() > 0) {
+			int thumbTop = filterThumbTop();
+			context.fill(right, filterTop(), filterScrollbarRight(), bottom, RenderUtils.getBackgroundColor(false, false));
+			context.fill(right, thumbTop, filterScrollbarRight(), thumbTop + filterThumbHeight(), RenderUtils.getBackgroundColor(true, true));
+		}
+	}
+
+	private Text filterOptionText(FilterOption option, String label) {
+		Text text = Text.literal(label);
+		return option.current || "minecraft".equals(option.source) ? text.copy().formatted(Formatting.ITALIC) : text;
+	}
+
+	private void drawFilterOptionLabel(DrawContext context, FilterOption option, int x, int rowY, int availableWidth) {
+		if (availableWidth <= 1) {
+			return;
+		}
+		Text label = filterOptionText(option, option.label);
+		int labelWidth = textRenderer.getWidth(label);
+		if (labelWidth <= availableWidth) {
+			context.drawTextWithShadow(textRenderer, label, x, rowY + 6, 0xffffff);
+			return;
+		}
+		float scale = (availableWidth - 1.0f) / labelWidth;
+		context.getMatrices().push();
+		context.getMatrices().translate(x, rowY + (FILTER_ROW_HEIGHT - textRenderer.fontHeight * scale) / 2.0f, 0);
+		context.getMatrices().scale(scale, scale, 1.0f);
+		context.drawTextWithShadow(textRenderer, label, 0, 0, 0xffffff);
+		context.getMatrices().pop();
+	}
+
+	private void renderFilterTooltip(DrawContext context, int mouseX, int mouseY) {
+		int column = filterColumnAt(mouseX, mouseY);
+		if (column < 0 || mouseY < filterRowsTop()) {
+			return;
+		}
+		List<FilterOption> options = visibleFilterOptions(column);
+		int index = (mouseY - filterRowsTop() + filterScroll) / FILTER_ROW_HEIGHT;
+		if (index < 0 || index >= options.size()) {
+			return;
+		}
+		int availableWidth = Math.max(0, filterColumnRight(column) - FILTER_CHECKBOX_SIZE - 7 - filterColumnLeft(column) - 9);
+		FilterOption option = options.get(index);
+		if (textRenderer.getWidth(filterOptionText(option, option.label)) > availableWidth) {
+			context.drawTooltip(textRenderer, filterOptionText(option, option.label), mouseX, mouseY);
+		}
+	}
+
 	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
+		if (filtersOpen && button == 0) {
+			if (filterMaxScroll() > 0 && mouseX >= filterRight() && mouseX < filterScrollbarRight()
+					&& mouseY >= filterTop() && mouseY < filterBottom()) {
+				int thumbTop = filterThumbTop();
+				int thumbHeight = filterThumbHeight();
+				int thumbBottom = thumbTop + thumbHeight;
+				if (mouseY < thumbTop - FILTER_SCROLLBAR_GRAB_PADDING || mouseY >= thumbBottom + FILTER_SCROLLBAR_GRAB_PADDING) {
+					filterScrollbarGrabOffset = thumbHeight / 2.0;
+					moveFilterScrollbar(mouseY);
+				} else {
+					filterScrollbarGrabOffset = MathHelper.clamp(mouseY - thumbTop, 0, thumbHeight);
+				}
+				draggingFilterScrollbar = true;
+				return true;
+			}
+			int column = filterColumnAt(mouseX, mouseY);
+			if (column >= 0 && mouseY >= filterRowsTop()) {
+				int index = (int) (mouseY - filterRowsTop() + filterScroll) / FILTER_ROW_HEIGHT;
+				List<FilterOption> options = visibleFilterOptions(column);
+				if (index >= 0 && index < options.size()) {
+					toggleFilter(column, options.get(index));
+				}
+				return true;
+			}
+		}
 		if (sortMenuOpen) {
 			int row = sortRowAt(mouseX, mouseY);
 			if (row >= 0) {
@@ -225,6 +583,10 @@ public class ExplorersCompassScreen extends Screen {
 
 	@Override
 	public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+		if (draggingFilterScrollbar && button == 0) {
+			moveFilterScrollbar(mouseY);
+			return true;
+		}
 		if (draggedSortRow >= 0 && button == 0) {
 			if (mouseX >= sortMenuX() && mouseX < sortMenuX() + sortMenuWidth()) {
 				int targetRow = MathHelper.clamp((int) Math.floor((mouseY - sortMenuY()) / SORT_ROW_HEIGHT), 0, sortOrder.size() - 1);
@@ -242,6 +604,10 @@ public class ExplorersCompassScreen extends Screen {
 
 	@Override
 	public boolean mouseReleased(double mouseX, double mouseY, int button) {
+		if (draggingFilterScrollbar && button == 0) {
+			draggingFilterScrollbar = false;
+			return true;
+		}
 		if (draggedSortRow >= 0 && button == 0) {
 			commitSortOrder();
 			draggedSortRow = -1;
@@ -252,6 +618,10 @@ public class ExplorersCompassScreen extends Screen {
 
 	@Override
 	public boolean keyPressed(int par1, int par2, int par3) {
+		if (filtersOpen && par1 == 256) {
+			setFiltersOpen(false);
+			return true;
+		}
 		if (sortMenuOpen && par1 == 256) {
 			closeSortMenu();
 			return true;
@@ -272,6 +642,37 @@ public class ExplorersCompassScreen extends Screen {
 			return true;
 		}
 		return ret;
+	}
+
+	private void moveFilterScrollbar(double mouseY) {
+		int maxScroll = filterMaxScroll();
+		if (maxScroll <= 0) {
+			return;
+		}
+		int travel = filterBottom() - filterTop() - filterThumbHeight();
+		filterScroll = MathHelper.clamp((int) ((mouseY - filterTop() - filterScrollbarGrabOffset) * maxScroll / travel), 0, maxScroll);
+	}
+
+	private void setFiltersOpen(boolean open) {
+		if (filtersOpen == open) {
+			return;
+		}
+		if (sortMenuOpen) {
+			closeSortMenu();
+		}
+		filtersOpen = open;
+		draggingFilterScrollbar = false;
+		searchTextField.setVisible(!open);
+		searchTextField.setFocused(false);
+		filterSearchTextField.setVisible(open);
+		filterSearchTextField.setFocused(false);
+		if (open) {
+			remove(selectionList);
+		} else {
+			addDrawableChild(selectionList);
+			processSearchTerm();
+		}
+		updateViewButtons();
 	}
 
 	public void searchForStructure(Identifier structureID) {
@@ -296,13 +697,16 @@ public class ExplorersCompassScreen extends Screen {
 
 	public void processSearchTerm() {
 		structureIDsMatchingSearch = new ArrayList<Identifier>();
-		String searchTerm = searchTextField.getText().toLowerCase();
+		String searchTerm = searchTextField.getText().toLowerCase(Locale.ROOT);
 		for (Identifier id : allowedStructureIDs) {
+			if (!FilterSelections.matches(id)) {
+				continue;
+			}
 			if (searchTerm.startsWith("@")) {
-				if (StructureUtils.getStructureSource(id).toLowerCase().contains(searchTerm.substring(1))) {
+				if (StructureUtils.getStructureSource(id).toLowerCase(Locale.ROOT).contains(searchTerm.substring(1))) {
 					structureIDsMatchingSearch.add(id);
 				}
-			} else if (StructureUtils.getStructureName(id).toLowerCase().contains(searchTerm)) {
+			} else if (StructureUtils.getStructureName(id).toLowerCase(Locale.ROOT).contains(searchTerm)) {
 				structureIDsMatchingSearch.add(id);
 			}
 		}
@@ -351,23 +755,78 @@ public class ExplorersCompassScreen extends Screen {
 				sortMenuOpen = true;
 			}
 		}));
+		filtersButton = addDrawableChild(new TransparentButton(10, sortOrderButton.getY() + 25, 85, 20, Text.translatable("string.explorerscompass.filters"), (onPress) -> {
+			setFiltersOpen(!filtersOpen);
+		}));
+		clearFiltersButton = addDrawableChild(new TransparentButton(100, sortOrderButton.getY() + 25, 20, 20, Text.literal(""), (onPress) -> {
+			FilterSelections.clear();
+			processSearchTerm();
+		}));
 
-		cancelButton = addDrawableChild(new TransparentButton(10, height - 30, 110, 20, Text.translatable("gui.cancel"), (onPress) -> {
+		cancelButton = addDrawableChild(new TransparentButton(width - 30, 10, 20, 20, Text.literal(""), (onPress) -> {
 			client.setScreen(null);
 		}));
 
-		teleportButton = addDrawableChild(new TransparentButton(width - 120, 10, 110, 20, Text.translatable("string.explorerscompass.teleport"), (onPress) -> {
+		teleportButton = addDrawableChild(new TransparentButton(10, 10, 110, 20, Text.translatable("string.explorerscompass.teleport"), (onPress) -> {
 			teleport();
 		}));
-		teleportButton.visible = ExplorersCompass.canTeleport;
 		teleportButton.active = false;
+		clearFiltersTopButton = addDrawableChild(new TransparentButton(10, 10, width >= 500 ? 110 : 85, 20, Text.translatable("string.explorerscompass.clearFilters"), (onPress) -> {
+			FilterSelections.clear();
+			processSearchTerm();
+		}));
+		backButton = addDrawableChild(new TransparentButton(10, 10, width >= 500 ? 110 : 50, 20, Text.translatable("string.explorerscompass.back"), (onPress) -> {
+			setFiltersOpen(false);
+		}));
+		positionTopButtons();
+		updateViewButtons();
 	}
 
 	private void setupTextFields() {
 		int searchX = selectionList.getRowLeft();
-		int availableWidth = Math.max(0, teleportButton.getX() - searchX - SEARCH_TELEPORT_GAP);
+		int rightButtonX = teleportButton.getY() == 10 ? teleportButton.getX() : cancelButton.getX();
+		int availableWidth = Math.max(0, rightButtonX - searchX - SEARCH_TELEPORT_GAP);
 		searchTextField = new TransparentTextField(textRenderer, searchX, 10, Math.min(SEARCH_FIELD_WIDTH, availableWidth), 20, Text.translatable("string.explorerscompass.search"));
 		addDrawableChild(searchTextField);
+		searchTextField.setVisible(!filtersOpen);
+		int filterSearchX = 20 + textRenderer.getWidth(Text.translatable("string.explorerscompass.filters"));
+		filterSearchTextField = new TransparentTextField(textRenderer, filterSearchX, 10, Math.max(1, Math.min(SEARCH_FIELD_WIDTH, clearFiltersTopButton.getX() - filterSearchX - SEARCH_TELEPORT_GAP)), 20, Text.translatable("string.explorerscompass.searchFilters"));
+		filterSearchTextField.setChangedListener(value -> {
+			filterScroll = 0;
+		});
+		addDrawableChild(filterSearchTextField);
+		filterSearchTextField.setVisible(filtersOpen);
+	}
+
+	private void positionFilterButtons() {
+		filtersButton.setY(sortOrderButton.getY() + 25);
+		clearFiltersButton.setY(sortOrderButton.getY() + 25);
+	}
+
+	private void positionTopButtons() {
+		cancelButton.setX(width - 30);
+		if (width >= 480) {
+			teleportButton.setX(cancelButton.getX() - teleportButton.getWidth() - 5);
+			teleportButton.setY(10);
+		} else {
+			teleportButton.setX(10);
+			teleportButton.setY(height - 30);
+		}
+		backButton.setX(cancelButton.getX() - backButton.getWidth() - 5);
+		clearFiltersTopButton.setX(backButton.getX() - clearFiltersTopButton.getWidth() - 5);
+	}
+
+	private void updateViewButtons() {
+		searchButton.visible = !filtersOpen;
+		searchForGroupButton.visible = !filtersOpen;
+		searchForNextButton.visible = !filtersOpen && ExplorersCompass.maxNextSearches > 0;
+		sortOrderButton.visible = !filtersOpen;
+		filtersButton.visible = !filtersOpen;
+		clearFiltersButton.visible = !filtersOpen;
+		cancelButton.visible = true;
+		teleportButton.visible = !filtersOpen && ExplorersCompass.canTeleport;
+		clearFiltersTopButton.visible = filtersOpen;
+		backButton.visible = filtersOpen;
 	}
 
 }
