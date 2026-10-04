@@ -12,7 +12,7 @@ public interface ISorting extends Comparator<Identifier> {
 	@Override
 	public int compare(Identifier id1, Identifier id2);
 
-	public Object getValue(Identifier id);
+	public String getValue(Identifier id);
 
 	public ISorting next();
 

@@ -17,7 +17,7 @@ public class DimensionSorting implements ISorting {
 	}
 
 	@Override
-	public Object getValue(Identifier id) {
+	public String getValue(Identifier id) {
 		return StructureUtils.structureDimensionsToString(ExplorersCompass.allowedStructureIDsToDimensionIDs.get(id));
 	}
 

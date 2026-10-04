@@ -1,5 +1,6 @@
 package com.chaosthedude.explorerscompass.gui;
 
+import java.text.Collator;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -30,6 +31,7 @@ import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
+import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
@@ -53,6 +55,14 @@ public class ExplorersCompassScreen extends Screen {
 	private static final int FILTER_SCROLLBAR_GRAB_PADDING = 2;
 	private static final int SETTINGS_ROW_HEIGHT = 30;
 	private static final int SETTINGS_CONTROL_WIDTH = 90;
+	private static final String[] SETTINGS_LABEL_KEYS = {
+		"string.explorerscompass.overlaySide",
+		"string.explorerscompass.overlayLineOffset",
+		"string.explorerscompass.displayWithChatOpen",
+		"string.explorerscompass.clearFiltersOnClose",
+		"string.explorerscompass.checkedFiltersFirst",
+		"string.explorerscompass.translateStructureNames"
+	};
 
 	private World world;
 	private PlayerEntity player;
@@ -242,6 +252,9 @@ public class ExplorersCompassScreen extends Screen {
 			context.drawTextWithShadow(textRenderer, Text.translatable("string.explorerscompass.settings"), 10, 15, 0xffffff);
 		} else {
 			context.drawCenteredTextWithShadow(textRenderer, title, 65, 15, 0xffffff);
+		}
+		if (settingsOpen) {
+			renderSettingsTooltip(context, mouseX, mouseY);
 		}
 	}
 
@@ -468,7 +481,8 @@ public class ExplorersCompassScreen extends Screen {
 		for (Identifier group : groups) {
 			filterOptions.get(2).add(new FilterOption(StructureUtils.getStructureName(group), null, group, false));
 		}
-		Comparator<FilterOption> alphabetical = Comparator.comparing((FilterOption option) -> option.label.toLowerCase(Locale.ROOT))
+		Collator collator = languageCollator();
+		Comparator<FilterOption> alphabetical = Comparator.comparing((FilterOption option) -> option.label, collator)
 				.thenComparing(option -> option.source != null ? option.source : option.id.toString());
 		for (List<FilterOption> options : filterOptions) {
 			options.sort(alphabetical);
@@ -545,18 +559,10 @@ public class ExplorersCompassScreen extends Screen {
 
 	private void renderSettingsPanel(DrawContext context) {
 		context.fill(filterLeft(), filterTop(), filterRight(), filterBottom(), 0xb0000000);
-		String[] labels = {
-			"string.explorerscompass.displayWithChatOpen",
-			"string.explorerscompass.translateStructureNames",
-			"string.explorerscompass.overlayLineOffset",
-			"string.explorerscompass.overlaySide",
-			"string.explorerscompass.clearFiltersOnClose",
-			"string.explorerscompass.checkedFiltersFirst"
-		};
 		int labelX = filterLeft() + 10;
 		int labelWidth = Math.max(1, settingsControlX() - labelX - 10);
-		for (int row = 0; row < labels.length; row++) {
-			String label = Text.translatable(labels[row]).getString();
+		for (int row = 0; row < SETTINGS_LABEL_KEYS.length; row++) {
+			String label = Text.translatable(SETTINGS_LABEL_KEYS[row]).getString();
 			int labelY = settingsRowY(row) + 6;
 			int textWidth = textRenderer.getWidth(label);
 			if (textWidth <= labelWidth) {
@@ -574,10 +580,40 @@ public class ExplorersCompassScreen extends Screen {
 		float offsetScale = Math.min(1.0f, 46.0f / Math.max(1, textRenderer.getWidth(offset)));
 		context.getMatrices().push();
 		context.getMatrices().translate(settingsControlX() + SETTINGS_CONTROL_WIDTH / 2.0,
-				settingsRowY(2) + (20 - textRenderer.fontHeight * offsetScale) / 2.0, 0);
+				settingsRowY(1) + (20 - textRenderer.fontHeight * offsetScale) / 2.0, 0);
 		context.getMatrices().scale(offsetScale, offsetScale, 1.0f);
 		context.drawCenteredTextWithShadow(textRenderer, offset, 0, 0, 0xffffff);
 		context.getMatrices().pop();
+	}
+
+	private void renderSettingsTooltip(DrawContext context, int mouseX, int mouseY) {
+		if (mouseY < settingsRowY(0)) {
+			return;
+		}
+		int row = (mouseY - settingsRowY(0)) / SETTINGS_ROW_HEIGHT;
+		if (row >= SETTINGS_LABEL_KEYS.length) {
+			return;
+		}
+		int labelX = filterLeft() + 10;
+		int labelWidth = Math.max(1, settingsControlX() - labelX - 10);
+		String label = Text.translatable(SETTINGS_LABEL_KEYS[row]).getString();
+		int textWidth = textRenderer.getWidth(label);
+		float scale = Math.min(1.0f, (float) labelWidth / Math.max(1, textWidth));
+		double textTop = settingsRowY(row) + 6 + textRenderer.fontHeight * (1.0f - scale) / 2.0f;
+		if (mouseX < labelX || mouseX >= labelX + textWidth * scale
+				|| mouseY < textTop || mouseY >= textTop + textRenderer.fontHeight * scale) {
+			return;
+		}
+		List<Text> lines = new ArrayList<>();
+		for (OrderedText line : textRenderer.wrapLines(Text.translatable(SETTINGS_LABEL_KEYS[row] + ".tooltip"), Math.min(240, width - 30))) {
+			StringBuilder content = new StringBuilder();
+			line.accept((index, style, codePoint) -> {
+				content.appendCodePoint(codePoint);
+				return true;
+			});
+			lines.add(Text.literal(content.toString()));
+		}
+		context.drawTooltip(textRenderer, lines, mouseX, mouseY);
 	}
 
 	private void updateSettingsButtonLabels() {
@@ -889,9 +925,10 @@ public class ExplorersCompassScreen extends Screen {
 
 	public List<Identifier> sortStructures() {
 		final List<Identifier> structures = new ArrayList<Identifier>(structureIDsMatchingSearch);
+		Collator collator = languageCollator();
 		structures.sort((first, second) -> {
 			for (SortCriterion criterion : sortOrder) {
-				int comparison = criterion.compare(first, second);
+				int comparison = criterion.compare(first, second, collator);
 				if (comparison != 0) {
 					return comparison;
 				}
@@ -899,6 +936,11 @@ public class ExplorersCompassScreen extends Screen {
 			return first.compareTo(second);
 		});
 		return structures;
+	}
+
+	private Collator languageCollator() {
+		String language = client.getLanguageManager().getLanguage();
+		return Collator.getInstance(Locale.forLanguageTag(language.replace('_', '-')));
 	}
 
 	private void setupButtons() {
@@ -940,44 +982,45 @@ public class ExplorersCompassScreen extends Screen {
 			setSettingsOpen(true);
 		}));
 		int controlX = settingsControlX();
-		chatOverlayButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(0), SETTINGS_CONTROL_WIDTH, 20, Text.empty(), (onPress) -> {
-			ExplorersCompassConfig.displayWithChatOpen = !ExplorersCompassConfig.displayWithChatOpen;
+		overlaySideButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(0), SETTINGS_CONTROL_WIDTH, 20, Text.empty(), (onPress) -> {
+			ExplorersCompassConfig.overlaySide = ExplorersCompassConfig.overlaySide == OverlaySide.LEFT ? OverlaySide.RIGHT : OverlaySide.LEFT;
 			ExplorersCompassConfig.save();
 			updateSettingsButtonLabels();
 		}));
-		translateNamesButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(1), SETTINGS_CONTROL_WIDTH, 20, Text.empty(), (onPress) -> {
-			ExplorersCompassConfig.translateStructureNames = !ExplorersCompassConfig.translateStructureNames;
-			ExplorersCompassConfig.save();
-			updateSettingsButtonLabels();
-			processSearchTerm();
-		}));
-		offsetDecreaseButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(2), 20, 20, Text.literal("−"), (onPress) -> {
+		offsetDecreaseButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(1), 20, 20, Text.literal("−"), (onPress) -> {
 			if (ExplorersCompassConfig.overlayLineOffset > Integer.MIN_VALUE) {
 				ExplorersCompassConfig.overlayLineOffset--;
 				ExplorersCompassConfig.save();
 			}
 		}));
-		offsetIncreaseButton = addDrawableChild(new TransparentButton(controlX + SETTINGS_CONTROL_WIDTH - 20, settingsRowY(2), 20, 20, Text.literal("+"), (onPress) -> {
+		offsetIncreaseButton = addDrawableChild(new TransparentButton(controlX + SETTINGS_CONTROL_WIDTH - 20, settingsRowY(1), 20, 20, Text.literal("+"), (onPress) -> {
 			if (ExplorersCompassConfig.overlayLineOffset < Integer.MAX_VALUE) {
 				ExplorersCompassConfig.overlayLineOffset++;
 				ExplorersCompassConfig.save();
 			}
 		}));
-		overlaySideButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(3), SETTINGS_CONTROL_WIDTH, 20, Text.empty(), (onPress) -> {
-			ExplorersCompassConfig.overlaySide = ExplorersCompassConfig.overlaySide == OverlaySide.LEFT ? OverlaySide.RIGHT : OverlaySide.LEFT;
+		chatOverlayButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(2), SETTINGS_CONTROL_WIDTH, 20, Text.empty(), (onPress) -> {
+			ExplorersCompassConfig.displayWithChatOpen = !ExplorersCompassConfig.displayWithChatOpen;
 			ExplorersCompassConfig.save();
 			updateSettingsButtonLabels();
 		}));
-		clearOnCloseButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(4), SETTINGS_CONTROL_WIDTH, 20, Text.empty(), (onPress) -> {
+		clearOnCloseButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(3), SETTINGS_CONTROL_WIDTH, 20, Text.empty(), (onPress) -> {
 			ExplorersCompassConfig.clearFiltersOnClose = !ExplorersCompassConfig.clearFiltersOnClose;
 			ExplorersCompassConfig.save();
 			updateSettingsButtonLabels();
 		}));
-		checkedFiltersFirstButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(5), SETTINGS_CONTROL_WIDTH, 20, Text.empty(), (onPress) -> {
+		checkedFiltersFirstButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(4), SETTINGS_CONTROL_WIDTH, 20, Text.empty(), (onPress) -> {
 			ExplorersCompassConfig.checkedFiltersFirst = !ExplorersCompassConfig.checkedFiltersFirst;
 			ExplorersCompassConfig.save();
 			updateSettingsButtonLabels();
 			filterScroll = MathHelper.clamp(filterScroll, 0, filterMaxScroll());
+		}));
+		translateNamesButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(5), SETTINGS_CONTROL_WIDTH, 20, Text.empty(), (onPress) -> {
+			ExplorersCompassConfig.translateStructureNames = !ExplorersCompassConfig.translateStructureNames;
+			ExplorersCompassConfig.save();
+			updateSettingsButtonLabels();
+			rebuildFilterOptions();
+			processSearchTerm();
 		}));
 		updateSettingsButtonLabels();
 

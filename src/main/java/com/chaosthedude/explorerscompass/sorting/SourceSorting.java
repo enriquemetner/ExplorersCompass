@@ -16,7 +16,7 @@ public class SourceSorting implements ISorting {
 	}
 
 	@Override
-	public Object getValue(Identifier id) {
+	public String getValue(Identifier id) {
 		return StructureUtils.getStructureSource(id);
 	}
 

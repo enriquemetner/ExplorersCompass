@@ -1,5 +1,7 @@
 package com.chaosthedude.explorerscompass.sorting;
 
+import java.text.Collator;
+
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.text.Text;
@@ -20,8 +22,8 @@ public enum SortCriterion {
 		this.comparator = comparator;
 	}
 
-	public int compare(Identifier first, Identifier second) {
-		return comparator.compare(first, second);
+	public int compare(Identifier first, Identifier second, Collator collator) {
+		return collator.compare(comparator.getValue(first), comparator.getValue(second));
 	}
 
 	public Text getLabel() {

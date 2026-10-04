@@ -16,7 +16,7 @@ public class NameSorting implements ISorting {
 	}
 
 	@Override
-	public Object getValue(Identifier id) {
+	public String getValue(Identifier id) {
 		return StructureUtils.getStructureName(id);
 	}
 

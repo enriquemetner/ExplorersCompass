@@ -1,6 +1,7 @@
 package com.chaosthedude.explorerscompass.sorting;
 
 import com.chaosthedude.explorerscompass.ExplorersCompass;
+import com.chaosthedude.explorerscompass.util.StructureUtils;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -16,8 +17,8 @@ public class GroupSorting implements ISorting {
 	}
 
 	@Override
-	public Object getValue(Identifier id) {
-		return ExplorersCompass.structureIDsToGroupIDs.get(id);
+	public String getValue(Identifier id) {
+		return StructureUtils.getStructureName(ExplorersCompass.structureIDsToGroupIDs.get(id));
 	}
 
 	@Override
