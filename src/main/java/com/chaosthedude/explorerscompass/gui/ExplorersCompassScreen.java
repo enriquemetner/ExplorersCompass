@@ -31,6 +31,8 @@ import net.minecraft.world.World;
 public class ExplorersCompassScreen extends Screen {
 	private static final int SORT_MENU_WIDTH = 110;
 	private static final int SORT_ROW_HEIGHT = 20;
+	private static final int SEARCH_FIELD_WIDTH = 210;
+	private static final int SEARCH_TELEPORT_GAP = 10;
 
 	private World world;
 	private PlayerEntity player;
@@ -82,9 +84,9 @@ public class ExplorersCompassScreen extends Screen {
 	protected void init() {
 		clearChildren();
 		setupButtons();
-		setupTextFields();
 		selectionList = new StructureSearchList(this, client, player, foundStructureId, 130, 40, width - 140, height - 50, 50);
 		addDrawableChild(selectionList);
+		setupTextFields();
 	}
 
 	@Override
@@ -362,7 +364,9 @@ public class ExplorersCompassScreen extends Screen {
 	}
 
 	private void setupTextFields() {
-		searchTextField = new TransparentTextField(textRenderer, width / 2 - 82, 10, 140, 20, Text.translatable("string.explorerscompass.search"));
+		int searchX = selectionList.getRowLeft();
+		int availableWidth = Math.max(0, teleportButton.getX() - searchX - SEARCH_TELEPORT_GAP);
+		searchTextField = new TransparentTextField(textRenderer, searchX, 10, Math.min(SEARCH_FIELD_WIDTH, availableWidth), 20, Text.translatable("string.explorerscompass.search"));
 		addDrawableChild(searchTextField);
 	}
 
