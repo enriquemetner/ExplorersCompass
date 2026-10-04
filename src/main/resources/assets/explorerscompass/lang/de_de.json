@@ -20,6 +20,7 @@
     "string.explorerscompass.filters": "Filter",
     "string.explorerscompass.settings": "Einstellungen",
     "string.explorerscompass.clearFiltersOnClose": "Filter beim Schließen löschen",
+    "string.explorerscompass.checkedFiltersFirst": "Ausgewählte Filter oben",
     "string.explorerscompass.displayWithChatOpen": "Im geöffneten Chat anzeigen",
     "string.explorerscompass.translateStructureNames": "Strukturnamen übersetzen",
     "string.explorerscompass.overlayLineOffset": "HUD-Zeilenversatz",

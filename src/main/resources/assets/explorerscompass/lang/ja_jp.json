@@ -20,6 +20,7 @@
     "string.explorerscompass.filters": "フィルター",
     "string.explorerscompass.settings": "設定",
     "string.explorerscompass.clearFiltersOnClose": "閉じるときにフィルターを解除",
+    "string.explorerscompass.checkedFiltersFirst": "選択したフィルターを上に",
     "string.explorerscompass.displayWithChatOpen": "チャット表示中も表示",
     "string.explorerscompass.translateStructureNames": "構造物の名前を翻訳",
     "string.explorerscompass.overlayLineOffset": "HUDの行オフセット",

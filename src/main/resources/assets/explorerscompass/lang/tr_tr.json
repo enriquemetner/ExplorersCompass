@@ -20,6 +20,7 @@
     "string.explorerscompass.filters": "Filtreler",
     "string.explorerscompass.settings": "Ayarlar",
     "string.explorerscompass.clearFiltersOnClose": "Kapatınca filtreleri temizle",
+    "string.explorerscompass.checkedFiltersFirst": "Seçili filtreler üstte",
     "string.explorerscompass.displayWithChatOpen": "Sohbet açıkken göster",
     "string.explorerscompass.translateStructureNames": "Yapı adlarını çevir",
     "string.explorerscompass.overlayLineOffset": "HUD satır kaydırması",

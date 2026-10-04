@@ -20,6 +20,7 @@
     "string.explorerscompass.filters": "篩選",
     "string.explorerscompass.settings": "設定",
     "string.explorerscompass.clearFiltersOnClose": "關閉時清除篩選",
+    "string.explorerscompass.checkedFiltersFirst": "已勾選篩選項置頂",
     "string.explorerscompass.displayWithChatOpen": "開啟聊天時顯示",
     "string.explorerscompass.translateStructureNames": "翻譯結構名稱",
     "string.explorerscompass.overlayLineOffset": "HUD 行偏移",

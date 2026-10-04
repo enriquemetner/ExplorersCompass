@@ -20,6 +20,7 @@
     "string.explorerscompass.filters": "Filtros",
     "string.explorerscompass.settings": "Configuración",
     "string.explorerscompass.clearFiltersOnClose": "Borrar filtros al cerrar",
+    "string.explorerscompass.checkedFiltersFirst": "Filtros marcados arriba",
     "string.explorerscompass.displayWithChatOpen": "Mostrar con el chat abierto",
     "string.explorerscompass.translateStructureNames": "Traducir nombres de estructuras",
     "string.explorerscompass.overlayLineOffset": "Desplazamiento vertical del HUD",
