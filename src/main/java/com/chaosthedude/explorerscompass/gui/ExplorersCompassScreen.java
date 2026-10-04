@@ -62,6 +62,7 @@ public class ExplorersCompassScreen extends Screen {
 	private ButtonWidget searchForGroupButton;
 	private ButtonWidget sortOrderButton;
 	private ButtonWidget filtersButton;
+	private ButtonWidget settingsButton;
 	private ButtonWidget clearFiltersButton;
 	private ButtonWidget clearFiltersTopButton;
 	private ButtonWidget backButton;
@@ -71,6 +72,7 @@ public class ExplorersCompassScreen extends Screen {
 	private TransparentTextField filterSearchTextField;
 	private StructureSearchList selectionList;
 	private boolean filtersOpen;
+	private boolean settingsOpen;
 	private int filterScroll;
 	private boolean draggingFilterScrollbar;
 	private double filterScrollbarGrabOffset;
@@ -116,6 +118,9 @@ public class ExplorersCompassScreen extends Screen {
 
 	@Override
 	public boolean mouseScrolled(double scroll1, double scroll2, double scroll3) {
+		if (settingsOpen) {
+			return super.mouseScrolled(scroll1, scroll2, scroll3);
+		}
 		if (filtersOpen) {
 			if (scroll1 >= filterLeft() && scroll1 < filterScrollbarRight() && scroll2 >= filterTop() && scroll2 < filterBottom()) {
 				filterScroll = MathHelper.clamp(filterScroll - (int) Math.signum(scroll3) * FILTER_ROW_HEIGHT, 0, filterMaxScroll());
@@ -134,7 +139,7 @@ public class ExplorersCompassScreen extends Screen {
 		clearChildren();
 		setupButtons();
 		selectionList = new StructureSearchList(this, client, player, foundStructureId, 130, 40, width - 140, height - 50, 50);
-		if (!filtersOpen) {
+		if (isStructureView()) {
 			addDrawableChild(selectionList);
 		}
 		setupTextFields();
@@ -150,11 +155,11 @@ public class ExplorersCompassScreen extends Screen {
 		boolean hasSelection = selectionList.hasSelection();
 		boolean selectionMatchesFound = hasSelection && foundStructureId != null && selectionList.getSelectedOrNull().getStructureID().equals(foundStructureId);
 
-		searchButton.active = !filtersOpen && hasSelection;
-		searchForGroupButton.active = !filtersOpen && hasSelection;
-		searchForNextButton.active = !filtersOpen && selectionMatchesFound;
-		teleportButton.active = !filtersOpen && selectionMatchesFound;
-		sortOrderButton.active = !filtersOpen;
+		searchButton.active = isStructureView() && hasSelection;
+		searchForGroupButton.active = isStructureView() && hasSelection;
+		searchForNextButton.active = isStructureView() && selectionMatchesFound;
+		teleportButton.active = isStructureView() && selectionMatchesFound;
+		sortOrderButton.active = isStructureView();
 
 		// Check if the allowed structure list has synced
 		if (ExplorersCompass.synced) {
@@ -162,11 +167,11 @@ public class ExplorersCompassScreen extends Screen {
 			allowedStructureIDs = new ArrayList<Identifier>(ExplorersCompass.allowedStructureIDs);
 			structureIDsMatchingSearch = new ArrayList<Identifier>(allowedStructureIDs);
 			selectionList = new StructureSearchList(this, client, player, foundStructureId, 130, 40, width - 140, height - 50, 50);
-			if (!filtersOpen) {
+			if (isStructureView()) {
 				addDrawableChild(selectionList);
 			}
 
-			teleportButton.visible = !filtersOpen && ExplorersCompass.canTeleport;
+			teleportButton.visible = isStructureView() && ExplorersCompass.canTeleport;
 			searchForNextButton.visible = ExplorersCompass.maxNextSearches > 0;
 			if (searchForNextButton.visible) {
 				sortOrderButton.setX(10);
@@ -190,6 +195,8 @@ public class ExplorersCompassScreen extends Screen {
         renderBackground(context);
 		if (filtersOpen) {
 			renderFilterPanel(context, mouseX, mouseY);
+		} else if (settingsOpen) {
+			context.fill(filterLeft(), filterTop(), filterRight(), filterBottom(), 0xb0000000);
 		}
 		super.render(context, mouseX, mouseY, partialTicks);
 		renderCrossIcon(context, cancelButton);
@@ -207,6 +214,8 @@ public class ExplorersCompassScreen extends Screen {
 		}
 		if (filtersOpen) {
 			context.drawTextWithShadow(textRenderer, Text.translatable("string.explorerscompass.filters"), 10, 15, 0xffffff);
+		} else if (settingsOpen) {
+			context.drawTextWithShadow(textRenderer, Text.translatable("string.explorerscompass.settings"), 10, 15, 0xffffff);
 		} else {
 			context.drawCenteredTextWithShadow(textRenderer, title, 65, 15, 0xffffff);
 		}
@@ -618,6 +627,10 @@ public class ExplorersCompassScreen extends Screen {
 
 	@Override
 	public boolean keyPressed(int par1, int par2, int par3) {
+		if (settingsOpen && par1 == 256) {
+			setSettingsOpen(false);
+			return true;
+		}
 		if (filtersOpen && par1 == 256) {
 			setFiltersOpen(false);
 			return true;
@@ -662,7 +675,7 @@ public class ExplorersCompassScreen extends Screen {
 		}
 		filtersOpen = open;
 		draggingFilterScrollbar = false;
-		searchTextField.setVisible(!open);
+		searchTextField.setVisible(isStructureView());
 		searchTextField.setFocused(false);
 		filterSearchTextField.setVisible(open);
 		filterSearchTextField.setFocused(false);
@@ -673,6 +686,29 @@ public class ExplorersCompassScreen extends Screen {
 			processSearchTerm();
 		}
 		updateViewButtons();
+	}
+
+	private void setSettingsOpen(boolean open) {
+		if (settingsOpen == open) {
+			return;
+		}
+		if (sortMenuOpen) {
+			closeSortMenu();
+		}
+		settingsOpen = open;
+		searchTextField.setVisible(isStructureView());
+		searchTextField.setFocused(false);
+		if (open) {
+			remove(selectionList);
+		} else {
+			addDrawableChild(selectionList);
+			processSearchTerm();
+		}
+		updateViewButtons();
+	}
+
+	private boolean isStructureView() {
+		return !filtersOpen && !settingsOpen;
 	}
 
 	public void searchForStructure(Identifier structureID) {
@@ -762,6 +798,9 @@ public class ExplorersCompassScreen extends Screen {
 			FilterSelections.clear();
 			processSearchTerm();
 		}));
+		settingsButton = addDrawableChild(new TransparentButton(10, height - 30, 110, 20, Text.translatable("string.explorerscompass.settings"), (onPress) -> {
+			setSettingsOpen(true);
+		}));
 
 		cancelButton = addDrawableChild(new TransparentButton(width - 30, 10, 20, 20, Text.literal(""), (onPress) -> {
 			client.setScreen(null);
@@ -776,7 +815,11 @@ public class ExplorersCompassScreen extends Screen {
 			processSearchTerm();
 		}));
 		backButton = addDrawableChild(new TransparentButton(10, 10, width >= 500 ? 110 : 50, 20, Text.translatable("string.explorerscompass.back"), (onPress) -> {
-			setFiltersOpen(false);
+			if (settingsOpen) {
+				setSettingsOpen(false);
+			} else {
+				setFiltersOpen(false);
+			}
 		}));
 		positionTopButtons();
 		updateViewButtons();
@@ -788,7 +831,7 @@ public class ExplorersCompassScreen extends Screen {
 		int availableWidth = Math.max(0, rightButtonX - searchX - SEARCH_TELEPORT_GAP);
 		searchTextField = new TransparentTextField(textRenderer, searchX, 10, Math.min(SEARCH_FIELD_WIDTH, availableWidth), 20, Text.translatable("string.explorerscompass.search"));
 		addDrawableChild(searchTextField);
-		searchTextField.setVisible(!filtersOpen);
+		searchTextField.setVisible(isStructureView());
 		int filterSearchX = 20 + textRenderer.getWidth(Text.translatable("string.explorerscompass.filters"));
 		filterSearchTextField = new TransparentTextField(textRenderer, filterSearchX, 10, Math.max(1, Math.min(SEARCH_FIELD_WIDTH, clearFiltersTopButton.getX() - filterSearchX - SEARCH_TELEPORT_GAP)), 20, Text.translatable("string.explorerscompass.searchFilters"));
 		filterSearchTextField.setChangedListener(value -> {
@@ -805,28 +848,30 @@ public class ExplorersCompassScreen extends Screen {
 
 	private void positionTopButtons() {
 		cancelButton.setX(width - 30);
+		settingsButton.setY(height - 30);
 		if (width >= 480) {
 			teleportButton.setX(cancelButton.getX() - teleportButton.getWidth() - 5);
 			teleportButton.setY(10);
 		} else {
 			teleportButton.setX(10);
-			teleportButton.setY(height - 30);
+			teleportButton.setY(height - 55);
 		}
 		backButton.setX(cancelButton.getX() - backButton.getWidth() - 5);
 		clearFiltersTopButton.setX(backButton.getX() - clearFiltersTopButton.getWidth() - 5);
 	}
 
 	private void updateViewButtons() {
-		searchButton.visible = !filtersOpen;
-		searchForGroupButton.visible = !filtersOpen;
-		searchForNextButton.visible = !filtersOpen && ExplorersCompass.maxNextSearches > 0;
-		sortOrderButton.visible = !filtersOpen;
-		filtersButton.visible = !filtersOpen;
-		clearFiltersButton.visible = !filtersOpen;
+		searchButton.visible = isStructureView();
+		searchForGroupButton.visible = isStructureView();
+		searchForNextButton.visible = isStructureView() && ExplorersCompass.maxNextSearches > 0;
+		sortOrderButton.visible = isStructureView();
+		filtersButton.visible = isStructureView();
+		clearFiltersButton.visible = isStructureView();
+		settingsButton.visible = isStructureView();
 		cancelButton.visible = true;
-		teleportButton.visible = !filtersOpen && ExplorersCompass.canTeleport;
+		teleportButton.visible = isStructureView() && ExplorersCompass.canTeleport;
 		clearFiltersTopButton.visible = filtersOpen;
-		backButton.visible = filtersOpen;
+		backButton.visible = filtersOpen || settingsOpen;
 	}
 
 }
