@@ -44,7 +44,7 @@ public class ExplorersCompassScreen extends Screen {
 	private static final int SORT_ROW_HEIGHT = 20;
 	private static final int SEARCH_FIELD_WIDTH = 210;
 	private static final int SEARCH_TELEPORT_GAP = 10;
-	private static final int FILTER_ROW_HEIGHT = 20;
+	private static final int PREFERRED_FILTER_ROW_HEIGHT = 20;
 	private static final int FILTER_HEADER_HEIGHT = 20;
 	private static final int FILTER_HEADER_GAP = 1;
 	private static final int FILTER_COLUMN_GAP = 1;
@@ -61,6 +61,7 @@ public class ExplorersCompassScreen extends Screen {
 		"string.explorerscompass.displayWithChatOpen",
 		"string.explorerscompass.clearFiltersOnClose",
 		"string.explorerscompass.checkedFiltersFirst",
+		"string.explorerscompass.adjustRowsToFitView",
 		"string.explorerscompass.translateStructureNames"
 	};
 
@@ -82,6 +83,7 @@ public class ExplorersCompassScreen extends Screen {
 	private ButtonWidget overlaySideButton;
 	private ButtonWidget clearOnCloseButton;
 	private ButtonWidget checkedFiltersFirstButton;
+	private ButtonWidget adjustRowsToFitViewButton;
 	private ButtonWidget offsetDecreaseButton;
 	private ButtonWidget offsetIncreaseButton;
 	private ButtonWidget clearFiltersButton;
@@ -157,7 +159,13 @@ public class ExplorersCompassScreen extends Screen {
 		}
 		if (filtersOpen) {
 			if (scroll1 >= filterLeft() && scroll1 < filterScrollbarRight() && scroll2 >= filterTop() && scroll2 < filterBottom()) {
-				filterScroll = MathHelper.clamp(filterScroll - scroll3 * FILTER_ROW_HEIGHT, 0, filterMaxScroll());
+				int rowHeight = filterRowHeight();
+				double target = filterScroll - scroll3 * rowHeight;
+				if (scroll3 != 0 && Math.rint(scroll3) == scroll3) {
+					double row = filterScroll / rowHeight - scroll3;
+					target = (scroll3 < 0 ? Math.floor(row) : Math.ceil(row)) * rowHeight;
+				}
+				filterScroll = MathHelper.clamp(target, 0, filterMaxScroll());
 				return true;
 			}
 			return super.mouseScrolled(scroll1, scroll2, scroll3);
@@ -327,7 +335,7 @@ public class ExplorersCompassScreen extends Screen {
 	}
 
 	private int filterLeft() {
-		return 10;
+		return SCROLLBAR_WIDTH;
 	}
 
 	private int filterRight() {
@@ -352,6 +360,30 @@ public class ExplorersCompassScreen extends Screen {
 
 	private int filterBottom() {
 		return height - 10;
+	}
+
+	private int filterVisibleRows() {
+		int availableHeight = Math.max(1, filterBottom() - filterRowsTop() - FILTER_SECTION_GAP);
+		return Math.max(1, availableHeight / PREFERRED_FILTER_ROW_HEIGHT);
+	}
+
+	private int filterRowHeight() {
+		if (!ExplorersCompassConfig.adjustRowsToFitView) {
+			return PREFERRED_FILTER_ROW_HEIGHT;
+		}
+		int availableHeight = Math.max(1, filterBottom() - filterRowsTop() - FILTER_SECTION_GAP);
+		return Math.max(PREFERRED_FILTER_ROW_HEIGHT, availableHeight / filterVisibleRows());
+	}
+
+	private int filterFullRowsBottom(int sectionStart) {
+		if (!ExplorersCompassConfig.adjustRowsToFitView) {
+			return filterBottom();
+		}
+		int rowsBottom = filterRowsTop() + filterVisibleRows() * filterRowHeight();
+		if (sectionStart >= 0 && filterRowsTop() + sectionStart * filterRowHeight() - visibleFilterScroll() < rowsBottom) {
+			rowsBottom += FILTER_SECTION_GAP;
+		}
+		return Math.min(filterBottom(), rowsBottom);
 	}
 
 	private int filterColumnLeft(int column) {
@@ -414,7 +446,7 @@ public class ExplorersCompassScreen extends Screen {
 	}
 
 	private int filterRowY(int index, int sectionStart) {
-		return filterRowsTop() + index * FILTER_ROW_HEIGHT - visibleFilterScroll()
+		return filterRowsTop() + index * filterRowHeight() - visibleFilterScroll()
 				+ (sectionStart >= 0 && index >= sectionStart ? FILTER_SECTION_GAP : 0);
 	}
 
@@ -423,9 +455,12 @@ public class ExplorersCompassScreen extends Screen {
 	}
 
 	private int filterOptionIndexAt(double mouseY, List<FilterOption> options, int sectionStart) {
+		if (mouseY >= filterFullRowsBottom(sectionStart)) {
+			return -1;
+		}
 		double offset = mouseY - filterRowsTop() + visibleFilterScroll();
 		if (sectionStart >= 0) {
-			int gapStart = sectionStart * FILTER_ROW_HEIGHT;
+			int gapStart = sectionStart * filterRowHeight();
 			if (offset >= gapStart && offset < gapStart + FILTER_SECTION_GAP) {
 				return -1;
 			}
@@ -433,19 +468,23 @@ public class ExplorersCompassScreen extends Screen {
 				offset -= FILTER_SECTION_GAP;
 			}
 		}
-		int index = (int) Math.floor(offset / FILTER_ROW_HEIGHT);
+		int index = (int) Math.floor(offset / filterRowHeight());
 		return index >= 0 && index < options.size() ? index : -1;
 	}
 
 	private int filterMaxScroll() {
-		int tallestColumn = 0;
+		int maxScroll = 0;
 		for (int column = showSourceColumn ? 0 : 1; column < 3; column++) {
 			List<FilterOption> options = visibleFilterOptions(column);
-			int columnHeight = options.size() * FILTER_ROW_HEIGHT
-					+ (filterSectionStart(column, options) >= 0 ? FILTER_SECTION_GAP : 0);
-			tallestColumn = Math.max(tallestColumn, columnHeight);
+			if (ExplorersCompassConfig.adjustRowsToFitView) {
+				maxScroll = Math.max(maxScroll, (options.size() - filterVisibleRows()) * filterRowHeight());
+			} else {
+				int columnHeight = options.size() * filterRowHeight()
+						+ (filterSectionStart(column, options) >= 0 ? FILTER_SECTION_GAP : 0);
+				maxScroll = Math.max(maxScroll, columnHeight - (filterBottom() - filterRowsTop()));
+			}
 		}
-		return Math.max(0, tallestColumn - Math.max(0, filterBottom() - filterRowsTop()));
+		return Math.max(0, maxScroll);
 	}
 
 	private int filterThumbHeight() {
@@ -554,7 +593,15 @@ public class ExplorersCompassScreen extends Screen {
 	}
 
 	private int settingsRowY(int row) {
-		return filterTop() + 10 + row * SETTINGS_ROW_HEIGHT;
+		return filterTop() + 10 + row * settingsRowHeight();
+	}
+
+	private int settingsRowHeight() {
+		return Math.min(SETTINGS_ROW_HEIGHT, Math.max(10, (filterBottom() - filterTop() - 10) / SETTINGS_LABEL_KEYS.length));
+	}
+
+	private int settingsControlHeight() {
+		return Math.min(20, settingsRowHeight());
 	}
 
 	private int settingsControlX() {
@@ -567,7 +614,7 @@ public class ExplorersCompassScreen extends Screen {
 		int labelWidth = Math.max(1, settingsControlX() - labelX - 10);
 		for (int row = 0; row < SETTINGS_LABEL_KEYS.length; row++) {
 			String label = Text.translatable(SETTINGS_LABEL_KEYS[row]).getString();
-			int labelY = settingsRowY(row) + 6;
+			int labelY = settingsRowY(row) + (settingsControlHeight() - textRenderer.fontHeight) / 2;
 			int textWidth = textRenderer.getWidth(label);
 			if (textWidth <= labelWidth) {
 				context.drawTextWithShadow(textRenderer, label, labelX, labelY, 0xffffff);
@@ -584,7 +631,7 @@ public class ExplorersCompassScreen extends Screen {
 		float offsetScale = Math.min(1.0f, 46.0f / Math.max(1, textRenderer.getWidth(offset)));
 		context.getMatrices().push();
 		context.getMatrices().translate(settingsControlX() + SETTINGS_CONTROL_WIDTH / 2.0,
-				settingsRowY(1) + (20 - textRenderer.fontHeight * offsetScale) / 2.0, 0);
+				settingsRowY(1) + (settingsControlHeight() - textRenderer.fontHeight * offsetScale) / 2.0, 0);
 		context.getMatrices().scale(offsetScale, offsetScale, 1.0f);
 		context.drawCenteredTextWithShadow(textRenderer, offset, 0, 0, 0xffffff);
 		context.getMatrices().pop();
@@ -594,7 +641,7 @@ public class ExplorersCompassScreen extends Screen {
 		if (mouseY < settingsRowY(0)) {
 			return;
 		}
-		int row = (mouseY - settingsRowY(0)) / SETTINGS_ROW_HEIGHT;
+		int row = (mouseY - settingsRowY(0)) / settingsRowHeight();
 		if (row >= SETTINGS_LABEL_KEYS.length) {
 			return;
 		}
@@ -603,7 +650,8 @@ public class ExplorersCompassScreen extends Screen {
 		String label = Text.translatable(SETTINGS_LABEL_KEYS[row]).getString();
 		int textWidth = textRenderer.getWidth(label);
 		float scale = Math.min(1.0f, (float) labelWidth / Math.max(1, textWidth));
-		double textTop = settingsRowY(row) + 6 + textRenderer.fontHeight * (1.0f - scale) / 2.0f;
+		double textTop = settingsRowY(row) + (settingsControlHeight() - textRenderer.fontHeight) / 2.0f
+				+ textRenderer.fontHeight * (1.0f - scale) / 2.0f;
 		if (mouseX < labelX || mouseX >= labelX + textWidth * scale
 				|| mouseY < textTop || mouseY >= textTop + textRenderer.fontHeight * scale) {
 			return;
@@ -625,6 +673,7 @@ public class ExplorersCompassScreen extends Screen {
 		translateNamesButton.setMessage(Text.translatable(ExplorersCompassConfig.translateStructureNames ? "options.on" : "options.off"));
 		clearOnCloseButton.setMessage(Text.translatable(ExplorersCompassConfig.clearFiltersOnClose ? "options.on" : "options.off"));
 		checkedFiltersFirstButton.setMessage(Text.translatable(ExplorersCompassConfig.checkedFiltersFirst ? "options.on" : "options.off"));
+		adjustRowsToFitViewButton.setMessage(Text.translatable(ExplorersCompassConfig.adjustRowsToFitView ? "options.on" : "options.off"));
 		overlaySideButton.setMessage(Text.translatable(ExplorersCompassConfig.overlaySide == OverlaySide.LEFT
 				? "string.explorerscompass.left" : "string.explorerscompass.right"));
 	}
@@ -640,7 +689,7 @@ public class ExplorersCompassScreen extends Screen {
 			List<FilterOption> options = visibleFilterOptions(column);
 			int sectionStart = filterSectionStart(column, options);
 			if (sectionStart >= 0) {
-				int gapY = filterRowsTop() + sectionStart * FILTER_ROW_HEIGHT - visibleFilterScroll();
+				int gapY = filterRowsTop() + sectionStart * filterRowHeight() - visibleFilterScroll();
 				context.fill(columnLeft, filterRowsTop(), columnRight, MathHelper.clamp(gapY, filterRowsTop(), bottom), 0xb0000000);
 				context.fill(columnLeft, MathHelper.clamp(gapY + FILTER_SECTION_GAP, filterRowsTop(), bottom), columnRight, bottom, 0xb0000000);
 			} else {
@@ -661,26 +710,28 @@ public class ExplorersCompassScreen extends Screen {
 			context.disableScissor();
 			List<FilterOption> options = visibleFilterOptions(column);
 			int sectionStart = filterSectionStart(column, options);
-			context.enableScissor(columnLeft + 1, filterRowsTop(), columnRight - 1, bottom);
+			int rowsBottom = filterFullRowsBottom(sectionStart);
+			int rowHeight = filterRowHeight();
+			context.enableScissor(columnLeft + 1, filterRowsTop(), columnRight - 1, rowsBottom);
 			int checkboxX = columnRight - FILTER_CHECKBOX_SIZE - 7;
 			for (int index = 0; index < options.size(); index++) {
 				int rowY = filterRowY(index, sectionStart);
-				if (rowY + FILTER_ROW_HEIGHT <= filterRowsTop() || rowY >= bottom) {
+				if (rowY + rowHeight <= filterRowsTop() || rowY >= rowsBottom) {
 					continue;
 				}
-				if (mouseX >= columnLeft && mouseX < columnRight && mouseY >= rowY && mouseY < rowY + FILTER_ROW_HEIGHT) {
-					context.fill(columnLeft + 1, rowY, columnRight - 1, rowY + FILTER_ROW_HEIGHT, 0x55242424);
+				if (mouseX >= columnLeft && mouseX < columnRight && mouseY >= rowY && mouseY < rowY + rowHeight) {
+					context.fill(columnLeft + 1, rowY, columnRight - 1, rowY + rowHeight, 0x55242424);
 				}
 				FilterOption option = options.get(index);
 				drawFilterOptionLabel(context, option, columnLeft + 5, rowY, Math.max(0, checkboxX - columnLeft - 9));
-				drawFilterCheckbox(context, checkboxX, rowY + 5, filterChecked(column, option));
+				drawFilterCheckbox(context, checkboxX, rowY + (rowHeight - FILTER_CHECKBOX_SIZE) / 2, filterChecked(column, option));
 			}
 			context.disableScissor();
 		}
 		if (filterMaxScroll() > 0) {
 			int thumbTop = filterThumbTop();
 			context.fill(right, filterTop(), filterScrollbarRight(), bottom, RenderUtils.getBackgroundColor(false, false));
-			context.fill(right, thumbTop, filterScrollbarRight(), thumbTop + filterThumbHeight(), RenderUtils.getBackgroundColor(true, true));
+			RenderUtils.drawScrollbarThumb(context, right, thumbTop, SCROLLBAR_WIDTH, filterThumbHeight(), RenderUtils.getBackgroundColor(true, true));
 		}
 	}
 
@@ -696,12 +747,12 @@ public class ExplorersCompassScreen extends Screen {
 		Text label = filterOptionText(option, option.label);
 		int labelWidth = textRenderer.getWidth(label);
 		if (labelWidth <= availableWidth) {
-			context.drawTextWithShadow(textRenderer, label, x, rowY + 6, 0xffffff);
+			context.drawTextWithShadow(textRenderer, label, x, rowY + (filterRowHeight() - textRenderer.fontHeight) / 2, 0xffffff);
 			return;
 		}
 		float scale = (availableWidth - 1.0f) / labelWidth;
 		context.getMatrices().push();
-		context.getMatrices().translate(x, rowY + (FILTER_ROW_HEIGHT - textRenderer.fontHeight * scale) / 2.0f, 0);
+		context.getMatrices().translate(x, rowY + (filterRowHeight() - textRenderer.fontHeight * scale) / 2.0f, 0);
 		context.getMatrices().scale(scale, scale, 1.0f);
 		context.drawTextWithShadow(textRenderer, label, 0, 0, 0xffffff);
 		context.getMatrices().pop();
@@ -986,45 +1037,54 @@ public class ExplorersCompassScreen extends Screen {
 			setSettingsOpen(true);
 		}));
 		int controlX = settingsControlX();
-		overlaySideButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(0), SETTINGS_CONTROL_WIDTH, 20, Text.empty(), (onPress) -> {
+		overlaySideButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(0), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), (onPress) -> {
 			ExplorersCompassConfig.overlaySide = ExplorersCompassConfig.overlaySide == OverlaySide.LEFT ? OverlaySide.RIGHT : OverlaySide.LEFT;
 			ExplorersCompassConfig.save();
 			updateSettingsButtonLabels();
 		}));
-		offsetDecreaseButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(1), 20, 20, Text.literal("−"), (onPress) -> {
+		offsetDecreaseButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(1), 20, settingsControlHeight(), Text.literal("−"), (onPress) -> {
 			if (ExplorersCompassConfig.overlayLineOffset > Integer.MIN_VALUE) {
 				ExplorersCompassConfig.overlayLineOffset--;
 				ExplorersCompassConfig.save();
 			}
 		}));
-		offsetIncreaseButton = addDrawableChild(new TransparentButton(controlX + SETTINGS_CONTROL_WIDTH - 20, settingsRowY(1), 20, 20, Text.literal("+"), (onPress) -> {
+		offsetIncreaseButton = addDrawableChild(new TransparentButton(controlX + SETTINGS_CONTROL_WIDTH - 20, settingsRowY(1), 20, settingsControlHeight(), Text.literal("+"), (onPress) -> {
 			if (ExplorersCompassConfig.overlayLineOffset < Integer.MAX_VALUE) {
 				ExplorersCompassConfig.overlayLineOffset++;
 				ExplorersCompassConfig.save();
 			}
 		}));
-		chatOverlayButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(2), SETTINGS_CONTROL_WIDTH, 20, Text.empty(), (onPress) -> {
+		chatOverlayButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(2), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), (onPress) -> {
 			ExplorersCompassConfig.displayWithChatOpen = !ExplorersCompassConfig.displayWithChatOpen;
 			ExplorersCompassConfig.save();
 			updateSettingsButtonLabels();
 		}));
-		clearOnCloseButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(3), SETTINGS_CONTROL_WIDTH, 20, Text.empty(), (onPress) -> {
+		clearOnCloseButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(3), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), (onPress) -> {
 			ExplorersCompassConfig.clearFiltersOnClose = !ExplorersCompassConfig.clearFiltersOnClose;
 			ExplorersCompassConfig.save();
 			updateSettingsButtonLabels();
 		}));
-		checkedFiltersFirstButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(4), SETTINGS_CONTROL_WIDTH, 20, Text.empty(), (onPress) -> {
+		checkedFiltersFirstButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(4), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), (onPress) -> {
 			ExplorersCompassConfig.checkedFiltersFirst = !ExplorersCompassConfig.checkedFiltersFirst;
 			ExplorersCompassConfig.save();
 			updateSettingsButtonLabels();
 			filterScroll = MathHelper.clamp(filterScroll, 0, filterMaxScroll());
 		}));
-		translateNamesButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(5), SETTINGS_CONTROL_WIDTH, 20, Text.empty(), (onPress) -> {
+		translateNamesButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(6), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), (onPress) -> {
 			ExplorersCompassConfig.translateStructureNames = !ExplorersCompassConfig.translateStructureNames;
 			ExplorersCompassConfig.save();
 			updateSettingsButtonLabels();
 			rebuildFilterOptions();
 			processSearchTerm();
+		}));
+		adjustRowsToFitViewButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(5), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), (onPress) -> {
+			Identifier selectedId = selectionList.hasSelection() ? selectionList.getSelectedOrNull().getStructureID() : null;
+			ExplorersCompassConfig.adjustRowsToFitView = !ExplorersCompassConfig.adjustRowsToFitView;
+			ExplorersCompassConfig.save();
+			remove(selectionList);
+			selectionList = new StructureSearchList(this, client, player, selectedId, 130, 40, width - 130 - SCROLLBAR_WIDTH, height - 50, 50);
+			filterScroll = MathHelper.clamp(filterScroll, 0, filterMaxScroll());
+			updateSettingsButtonLabels();
 		}));
 		updateSettingsButtonLabels();
 
@@ -1102,6 +1162,7 @@ public class ExplorersCompassScreen extends Screen {
 		overlaySideButton.visible = settingsOpen;
 		clearOnCloseButton.visible = settingsOpen;
 		checkedFiltersFirstButton.visible = settingsOpen;
+		adjustRowsToFitViewButton.visible = settingsOpen;
 		cancelButton.visible = true;
 		teleportButton.visible = isStructureView() && ExplorersCompass.canTeleport;
 		clearFiltersTopButton.visible = filtersOpen;

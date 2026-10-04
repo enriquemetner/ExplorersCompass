@@ -2,6 +2,7 @@ package com.chaosthedude.explorerscompass.gui;
 
 import java.util.Objects;
 
+import com.chaosthedude.explorerscompass.config.ExplorersCompassConfig;
 import com.chaosthedude.explorerscompass.util.RenderUtils;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
@@ -22,13 +23,33 @@ public class StructureSearchList extends AlwaysSelectedEntryListWidget<Structure
 	private final PlayerEntity player;
 
 	public StructureSearchList(ExplorersCompassScreen parentScreen, MinecraftClient client, PlayerEntity player, Identifier structureIdToSelect, int x, int y, int width, int height, int slotHeight) {
-		super(client, width, height, y, y + height, slotHeight);
+		super(client, width, height, y, y + height, ExplorersCompassConfig.adjustRowsToFitView ? fittedRowHeight(height, slotHeight) : slotHeight);
 		this.parentScreen = parentScreen;
 		this.player = player;
 		// Cancel the list widget's default 4px top padding so rows meet the scrollbar track.
 		headerHeight = -4;
         setLeftPos(x);
 		refreshList(structureIdToSelect);
+	}
+
+	private static int fittedRowHeight(int viewportHeight, int preferredRowHeight) {
+		int visibleRows = Math.max(1, viewportHeight / preferredRowHeight);
+		return Math.max(preferredRowHeight, viewportHeight / visibleRows);
+	}
+
+	private int fullRowsBottom() {
+		if (!ExplorersCompassConfig.adjustRowsToFitView) {
+			return bottom;
+		}
+		return Math.min(bottom, top + Math.max(1, (bottom - top) / itemHeight) * itemHeight);
+	}
+
+	@Override
+	public int getMaxScroll() {
+		if (!ExplorersCompassConfig.adjustRowsToFitView) {
+			return super.getMaxScroll();
+		}
+		return Math.max(0, getEntryCount() * itemHeight - (fullRowsBottom() - top));
 	}
 
 	@Override
@@ -38,14 +59,19 @@ public class StructureSearchList extends AlwaysSelectedEntryListWidget<Structure
 
 	@Override
 	public boolean isMouseOver(double mouseX, double mouseY) {
-		return super.isMouseOver(mouseX, mouseY)
+		return super.isMouseOver(mouseX, mouseY) && (mouseY < fullRowsBottom() || mouseX >= getScrollbarPositionX())
 				|| getMaxScroll() > 0 && mouseX >= getScrollbarPositionX() && mouseX < getScrollbarPositionX() + SCROLLBAR_WIDTH
 						&& mouseY >= top && mouseY <= bottom;
 	}
 
 	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
-		setScrollAmount(getScrollAmount() - amount * itemHeight);
+		if (amount != 0 && Math.rint(amount) == amount) {
+			double row = getScrollAmount() / itemHeight - amount;
+			setScrollAmount((amount < 0 ? Math.floor(row) : Math.ceil(row)) * itemHeight);
+		} else {
+			setScrollAmount(getScrollAmount() - amount * itemHeight);
+		}
 		return true;
 	}
 
@@ -61,6 +87,9 @@ public class StructureSearchList extends AlwaysSelectedEntryListWidget<Structure
 
 	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
+		if (mouseX < getScrollbarPositionX() && mouseY >= fullRowsBottom() && mouseY < bottom) {
+			return false;
+		}
 		boolean handled = super.mouseClicked(mouseX, mouseY, button);
 		if (handled && button == 0 && getMaxScroll() > 0
 				&& mouseX >= getScrollbarPositionX() && mouseX < getScrollbarPositionX() + SCROLLBAR_WIDTH) {
@@ -86,10 +115,11 @@ public class StructureSearchList extends AlwaysSelectedEntryListWidget<Structure
 
 	@Override
 	public void render(DrawContext context, int mouseX, int mouseY, float partialTicks) {
-        enableScissor(context);
+		int rowsBottom = fullRowsBottom();
+		context.enableScissor(left, top, right, rowsBottom);
         // Render backgrounds
         for (int i = 0; i < getEntryCount(); ++i) {
-            if (getRowBottom(i) >= top && getRowTop(i) <= bottom) {
+            if (getRowBottom(i) >= top && getRowTop(i) <= rowsBottom) {
                 StructureSearchEntry entry = getEntry(i);
                 int fillColor = RenderUtils.getBackgroundColor(entry.isEnabled(), entry == getSelectedOrNull());
                 context.fill(getRowLeft(), getRowTop(i), right, getRowBottom(i), fillColor);
@@ -99,13 +129,16 @@ public class StructureSearchList extends AlwaysSelectedEntryListWidget<Structure
         for (int i = 0; i < getEntryCount(); ++i) {
             int entryTop = getRowTop(i);
             int entryBottom = getRowBottom(i);
-            if (entryBottom >= top && entryTop <= bottom) {
+            if (entryBottom >= top && entryTop <= rowsBottom) {
                 StructureSearchEntry entry = getEntry(i);
                 boolean isHovering = isMouseOver(mouseX, mouseY) && Objects.equals(getEntryAtPosition(mouseX, mouseY), entry);
                 entry.render(context, i, entryTop, getRowLeft(), getRowWidth(), itemHeight, mouseX, mouseY, isHovering, partialTicks);
             }
         }
         context.disableScissor();
+		if (rowsBottom < bottom) {
+			context.fill(getRowLeft(), rowsBottom, right, bottom, RenderUtils.getBackgroundColor(false, false));
+		}
         // Render scrollbar
         if (getMaxScroll() > 0) {
             int scrollbarLeft = getScrollbarPositionX();
@@ -113,7 +146,7 @@ public class StructureSearchList extends AlwaysSelectedEntryListWidget<Structure
             int scrollbarHeight = getScrollbarThumbHeight();
             int scrollbarTop = getScrollbarThumbTop();
             context.fill(scrollbarLeft, top, scrollbarRight, bottom, RenderUtils.getBackgroundColor(false, false));
-            context.fill(scrollbarLeft, scrollbarTop, scrollbarRight, scrollbarTop + scrollbarHeight, RenderUtils.getBackgroundColor(true, true));
+            RenderUtils.drawScrollbarThumb(context, scrollbarLeft, scrollbarTop, SCROLLBAR_WIDTH, scrollbarHeight, RenderUtils.getBackgroundColor(true, true));
         }
 	}
 

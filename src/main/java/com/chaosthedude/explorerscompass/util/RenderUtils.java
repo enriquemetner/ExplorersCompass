@@ -30,6 +30,33 @@ public class RenderUtils {
 		}
 	}
 
+	public static void drawScrollbarThumb(DrawContext context, int x, int y, int width, int height, int color) {
+		if (width < 6 || height < 6) {
+			context.fill(x, y, x + width, y + height, color);
+			return;
+		}
+		int firstLineY = y + (height - 4) / 2;
+		int secondLineY = firstLineY + 3;
+		context.fill(x, y, x + width, firstLineY, color);
+		context.fill(x, firstLineY + 1, x + width, secondLineY, color);
+		context.fill(x, secondLineY + 1, x + width, y + height, color);
+		drawDotRow(context, x, firstLineY, width, color);
+		drawDotRow(context, x, secondLineY, width, color);
+	}
+
+	private static void drawDotRow(DrawContext context, int x, int y, int width, int color) {
+		// Half-pixel horizontal coordinates keep the closer pair distinct and centered on a 6px thumb.
+		int firstDot = 3;
+		int secondDot = width * 2 - firstDot - 2;
+		context.getMatrices().push();
+		context.getMatrices().translate(x, 0, 0);
+		context.getMatrices().scale(0.5f, 1.0f, 1.0f);
+		context.fill(0, y, firstDot, y + 1, color);
+		context.fill(firstDot + 2, y, secondDot, y + 1, color);
+		context.fill(secondDot + 2, y, width * 2, y + 1, color);
+		context.getMatrices().pop();
+	}
+
     public static int getBackgroundColor(boolean active, boolean hovered) {
         float state = 2;
         if (!active) {
