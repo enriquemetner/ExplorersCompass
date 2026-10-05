@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.HashMap;
 import java.util.UUID;
 import java.util.Map;
+import java.util.LinkedHashSet;
 
 import com.chaosthedude.explorerscompass.ExplorersCompass;
 import com.chaosthedude.explorerscompass.config.ExplorersCompassConfig;
@@ -202,8 +203,34 @@ public class ExplorersCompassItem extends Item {
         }
 	}
 
+    public void searchForListedStructures(ServerWorld world, PlayerEntity player, BlockPos pos, List<Identifier> requestedIds, ItemStack stack, int requestId) {
+        if (isBroken(stack) || requestedIds.isEmpty() || requestedIds.size() > 32767) {
+            SearchResultPacket.send((ServerPlayerEntity) player, requestId, SearchResultPacket.REJECTED, 0);
+            return;
+        }
+        List<Identifier> allowed = StructureUtils.getAllowedStructureIDs(world);
+        if (!allowed.containsAll(requestedIds)) {
+            SearchResultPacket.send((ServerPlayerEntity) player, requestId, SearchResultPacket.REJECTED, 0);
+            return;
+        }
+        List<Identifier> uniqueIds = new ArrayList<>(new LinkedHashSet<>(requestedIds));
+        List<Identifier> searchable = searchableInDimension(world, uniqueIds);
+        if (searchable.size() != uniqueIds.size()) {
+            SearchResultPacket.send((ServerPlayerEntity) player, requestId, SearchResultPacket.WRONG_DIMENSION, 0);
+            return;
+        }
+        List<Structure> structures = new ArrayList<>();
+        for (Identifier id : searchable) structures.add(StructureUtils.getStructureForID(world, id));
+        SearchSession session = beginSearch(player, stack, requestId);
+        Identifier firstId = searchable.get(0);
+        setSearching(stack, firstId, false);
+        stack.getNbt().putBoolean("IsListed", true);
+        session.workers.createWorkers(world, player, stack, structures, firstId, false, pos, new ArrayList<>());
+        if (!session.workers.start()) fail(player, stack, firstId, 0, 0);
+    }
+
 	public void searchForNextStructure(ServerWorld world, PlayerEntity player, BlockPos pos, ItemStack stack, int requestId) {
-		if (!isBroken(stack) && ItemUtils.verifyNBT(stack)) {
+		if (!isBroken(stack) && ItemUtils.verifyNBT(stack) && !stack.getNbt().getBoolean("IsListed")) {
 			String structureIdStr = stack.getNbt().getString("StructureID");
 			List<BlockPos> prevPos = getPrevPos(stack);
 			boolean isGroup = stack.getNbt().getBoolean("IsGroup");
@@ -253,11 +280,13 @@ public class ExplorersCompassItem extends Item {
 	}
 
 	public void succeed(PlayerEntity player, ItemStack stack, Identifier structureID, boolean isGroup, int x, int z, List<BlockPos> prevPos, int samples, boolean displayCoordinates) {
+		boolean isListed = stack.hasNbt() && stack.getNbt().getBoolean("IsListed");
 		clearSearchData(stack);
 		if (ItemUtils.verifyNBT(stack)) {
 			stack.getNbt().putString("StructureID", structureID.toString());
 			stack.getNbt().putInt("State", CompassState.FOUND.getID());
 			stack.getNbt().putBoolean("IsGroup", isGroup);
+			stack.getNbt().putBoolean("IsListed", isListed);
 			stack.getNbt().putInt("FoundX", x);
 			stack.getNbt().putInt("FoundZ", z);
 			stack.getNbt().putInt("Samples", samples);
@@ -296,6 +325,7 @@ public class ExplorersCompassItem extends Item {
 
 	public void setSearching(ItemStack stack, Identifier structureID, boolean isGroup) {
 		if (ItemUtils.verifyNBT(stack)) {
+			stack.getNbt().remove("IsListed");
 			stack.getNbt().putString("StructureID", structureID.toString());
 			stack.getNbt().putBoolean("IsGroup", isGroup);
 			stack.getNbt().putInt("State", CompassState.SEARCHING.getID());
@@ -487,6 +517,7 @@ public class ExplorersCompassItem extends Item {
 			stack.getNbt().remove("FoundZ");
 			stack.getNbt().remove("PrevPos");
 			stack.getNbt().remove("IsGroup");
+			stack.getNbt().remove("IsListed");
 			stack.getNbt().remove("DisplayCoordinates");
 			stack.getNbt().remove("SearchRadius");
 			stack.getNbt().remove("Samples");

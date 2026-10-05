@@ -97,11 +97,6 @@ public class StructureSearchEntry extends AlwaysSelectedEntryListWidget.Entry<St
 		parentScreen.searchForStructure(structureID);
 	}
 
-	public void searchForStructureGroup() {
-		client.getSoundManager().play(PositionedSoundInstance.master(SoundEvents.UI_BUTTON_CLICK, 1.0F));
-		parentScreen.searchForStructureGroup(ExplorersCompass.structureIDsToGroupIDs.get(structureID));
-	}
-
 	public boolean isEnabled() {
 		return ExplorersCompass.infiniteXp || player == null || player.experienceLevel >= xpLevels;
 	}
