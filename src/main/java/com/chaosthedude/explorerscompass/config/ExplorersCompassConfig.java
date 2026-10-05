@@ -33,6 +33,7 @@ public class ExplorersCompassConfig {
 	public static int defaultXpLevel = 0;
 	public static Map<String, Integer> perStructureXpLevels = new HashMap<String, Integer>();
 	public static List<String> structureBlacklist = new ArrayList<String>();
+	public static List<String> hiddenStructures = new ArrayList<String>();
 
 	public static boolean displayWithChatOpen = true;
 	public static boolean pauseGameWhenOpen = false;
@@ -82,6 +83,7 @@ public class ExplorersCompassConfig {
 				overlayLineOffset = data.client.overlayLineOffset;
 				overlaySide = data.client.overlaySide;
 				sortOrder = normalizeSortOrder(data.client.sortOrder);
+			hiddenStructures = data.client.hiddenStructures == null ? new ArrayList<String>() : new ArrayList<String>(data.client.hiddenStructures);
 
 				reader.close();
 			} catch (IOException e) {
@@ -94,7 +96,7 @@ public class ExplorersCompassConfig {
 	public static void save() {
 		try {
 			Writer writer = Files.newBufferedWriter(getFilePath());
-			Data data = new Data(new Data.Common(allowTeleport, maxNextSearches, displayCoordinates, maxRadius, maxSamples, compassDurability, defaultXpLevel, perStructureXpLevels, structureBlacklist), new Data.Client(displayWithChatOpen, pauseGameWhenOpen, clearFiltersOnClose, checkedFiltersFirst, adjustRowsToFitView, translateStructureNames, overlayLineOffset, overlaySide, sortOrder));
+			Data data = new Data(new Data.Common(allowTeleport, maxNextSearches, displayCoordinates, maxRadius, maxSamples, compassDurability, defaultXpLevel, perStructureXpLevels, structureBlacklist), new Data.Client(displayWithChatOpen, pauseGameWhenOpen, clearFiltersOnClose, checkedFiltersFirst, adjustRowsToFitView, translateStructureNames, overlayLineOffset, overlaySide, sortOrder, hiddenStructures));
 			gson.toJson(data, writer);
 			writer.close();
 		} catch (IOException e) {
@@ -193,6 +195,7 @@ public class ExplorersCompassConfig {
 			private final String overlaySideComment = "The side for information rendered on the HUD. Ex: LEFT, RIGHT";
 			private final OverlaySide overlaySide;
 			private final List<String> sortOrder;
+			private final List<String> hiddenStructures;
 
 			private Client() {
 				displayWithChatOpen = true;
@@ -204,9 +207,10 @@ public class ExplorersCompassConfig {
 				overlayLineOffset = 1;
 				overlaySide = OverlaySide.LEFT;
 				sortOrder = defaultSortOrder();
+			hiddenStructures = new ArrayList<String>();
 			}
 
-			private Client(boolean displayWithChatOpen, boolean pauseGameWhenOpen, boolean clearFiltersOnClose, boolean checkedFiltersFirst, boolean adjustRowsToFitView, boolean translateStructureNames, int overlayLineOffset, OverlaySide overlaySide, List<String> sortOrder) {
+			private Client(boolean displayWithChatOpen, boolean pauseGameWhenOpen, boolean clearFiltersOnClose, boolean checkedFiltersFirst, boolean adjustRowsToFitView, boolean translateStructureNames, int overlayLineOffset, OverlaySide overlaySide, List<String> sortOrder, List<String> hiddenStructures) {
 				this.displayWithChatOpen = displayWithChatOpen;
 				this.pauseGameWhenOpen = pauseGameWhenOpen;
 				this.clearFiltersOnClose = clearFiltersOnClose;
@@ -216,6 +220,7 @@ public class ExplorersCompassConfig {
 				this.overlayLineOffset = overlayLineOffset;
 				this.overlaySide = overlaySide;
 				this.sortOrder = normalizeSortOrder(sortOrder);
+				this.hiddenStructures = new ArrayList<String>(hiddenStructures);
 			}
 		}
 	}

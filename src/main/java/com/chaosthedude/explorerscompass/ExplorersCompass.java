@@ -12,6 +12,7 @@ import com.chaosthedude.explorerscompass.config.ExplorersCompassConfig;
 import com.chaosthedude.explorerscompass.items.ExplorersCompassItem;
 import com.chaosthedude.explorerscompass.network.SearchForNextPacket;
 import com.chaosthedude.explorerscompass.network.SearchPacket;
+import com.chaosthedude.explorerscompass.network.CancelSearchPacket;
 import com.chaosthedude.explorerscompass.network.SyncPacket;
 import com.chaosthedude.explorerscompass.network.TeleportPacket;
 import com.google.common.collect.ArrayListMultimap;
@@ -20,6 +21,7 @@ import com.google.common.collect.ListMultimap;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.item.ItemGroups;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
@@ -51,6 +53,8 @@ public class ExplorersCompass implements ModInitializer {
 		ItemGroupEvents.modifyEntriesEvent(ItemGroups.TOOLS).register(entries -> entries.add(EXPLORERS_COMPASS_ITEM));
 
 		ServerPlayNetworking.registerGlobalReceiver(SearchPacket.ID, SearchPacket::apply);
+		ServerPlayNetworking.registerGlobalReceiver(CancelSearchPacket.ID, CancelSearchPacket::apply);
+        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> EXPLORERS_COMPASS_ITEM.cancelSearch(handler.player, -1));
 		ServerPlayNetworking.registerGlobalReceiver(SearchForNextPacket.ID, SearchForNextPacket::apply);
 		ServerPlayNetworking.registerGlobalReceiver(TeleportPacket.ID, TeleportPacket::apply);
 

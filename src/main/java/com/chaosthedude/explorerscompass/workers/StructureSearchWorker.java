@@ -107,7 +107,7 @@ public abstract class StructureSearchWorker<T extends StructurePlacement> implem
 	protected void succeed(BlockPos pos, Structure structure) {
 		ExplorersCompass.LOGGER.info("SearchWorkerManager " + managerId + ": " + getName() + " succeeded with " + (shouldLogRadius() ? getRadius() + " radius, " : "") + samples + " samples");
 		if (!stack.isEmpty() && stack.getItem() == ExplorersCompass.EXPLORERS_COMPASS_ITEM) {
-			((ExplorersCompassItem) stack.getItem()).succeed(stack, StructureUtils.getIDForStructure(level, structure), isGroup, pos.getX(), pos.getZ(), prevPos, samples, ExplorersCompassConfig.displayCoordinates);
+			((ExplorersCompassItem) stack.getItem()).succeed(player, stack, StructureUtils.getIDForStructure(level, structure), isGroup, pos.getX(), pos.getZ(), prevPos, samples, ExplorersCompassConfig.displayCoordinates);
 		} else {
 			ExplorersCompass.LOGGER.error("SearchWorkerManager " + managerId + ": " + getName() + " found invalid compass after successful search");
 		}
@@ -121,7 +121,7 @@ public abstract class StructureSearchWorker<T extends StructurePlacement> implem
 	protected void fail() {
 		ExplorersCompass.LOGGER.info("SearchWorkerManager " + managerId + ": " + getName() + " failed with " + (shouldLogRadius() ? getRadius() + " radius, " : "") + samples + " samples");
 		if (!stack.isEmpty() && stack.getItem() == ExplorersCompass.EXPLORERS_COMPASS_ITEM) {
-			((ExplorersCompassItem) stack.getItem()).fail(stack, structureOrGroupId, roundRadius(getRadius(), 250), samples);
+			((ExplorersCompassItem) stack.getItem()).fail(player, stack, structureOrGroupId, getRadius(), samples);
 		} else {
 			ExplorersCompass.LOGGER.error("SearchWorkerManager " + managerId + ": " + getName() + " found invalid compass after failed search");
 		}

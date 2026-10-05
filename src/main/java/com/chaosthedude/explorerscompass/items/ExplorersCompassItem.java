@@ -2,12 +2,15 @@ package com.chaosthedude.explorerscompass.items;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashMap;
+import java.util.UUID;
 import java.util.Map;
 
 import com.chaosthedude.explorerscompass.ExplorersCompass;
 import com.chaosthedude.explorerscompass.config.ExplorersCompassConfig;
 import com.chaosthedude.explorerscompass.gui.GuiWrapper;
 import com.chaosthedude.explorerscompass.network.SyncPacket;
+import com.chaosthedude.explorerscompass.network.SearchResultPacket;
 import com.chaosthedude.explorerscompass.util.CompassState;
 import com.chaosthedude.explorerscompass.util.ItemUtils;
 import com.chaosthedude.explorerscompass.util.PlayerUtils;
@@ -37,11 +40,65 @@ public class ExplorersCompassItem extends Item {
 
 	public static final String NAME = "explorerscompass";
 
-	private SearchWorkerManager workerManager;
+	private final Map<UUID, SearchSession> searches = new HashMap<>();
+
+    private static class SearchSession {
+        final SearchWorkerManager workers = new SearchWorkerManager();
+        final ItemStack stack;
+        final NbtCompound previousNbt;
+        final int requestId;
+        int maxRadius;
+        SearchSession(ItemStack stack, int requestId) {
+            this.stack = stack;
+            this.previousNbt = stack.hasNbt() ? stack.getNbt().copy() : null;
+            this.requestId = requestId;
+        }
+    }
+
+    private SearchSession beginSearch(PlayerEntity player, ItemStack stack, int requestId) {
+        cancelSearch(player, -1);
+        SearchSession session = new SearchSession(stack, requestId);
+        searches.put(player.getUuid(), session);
+        return session;
+    }
+
+    public void cancelSearch(PlayerEntity player, int requestId) {
+        SearchSession session = searches.get(player.getUuid());
+        if (session != null && (requestId == -1 || session.requestId == requestId)) {
+            session.workers.stop();
+            session.workers.clear();
+            searches.remove(player.getUuid());
+            if (!session.stack.isEmpty() && session.stack.getItem() == this && getState(session.stack) == CompassState.SEARCHING) {
+                session.stack.setNbt(session.previousNbt == null ? null : session.previousNbt.copy());
+            }
+        }
+    }
+
+    private void finishSearch(PlayerEntity player, int result, int radius) {
+        SearchSession session = searches.remove(player.getUuid());
+        if (session != null) {
+            session.workers.stop();
+            session.workers.clear();
+            if (player instanceof ServerPlayerEntity serverPlayer) {
+                SearchResultPacket.send(serverPlayer, session.requestId, result, radius);
+            }
+        }
+    }
+
+    private List<Identifier> searchableInDimension(ServerWorld world, List<Identifier> ids) {
+        List<Identifier> allowed = StructureUtils.getAllowedStructureIDs(world);
+        List<Identifier> searchable = new ArrayList<>();
+        for (Identifier id : ids) {
+            Structure structure = StructureUtils.getStructureForID(world, id);
+            if (allowed.contains(id) && structure != null && StructureUtils.getGeneratingDimensionIDs(world, structure).contains(world.getRegistryKey().getValue())) {
+                searchable.add(id);
+            }
+        }
+        return searchable;
+    }
 
 	public ExplorersCompassItem() {
 		super(new FabricItemSettings().maxCount(1));
-		workerManager = new SearchWorkerManager();
 	}
 
 	@Override
@@ -67,8 +124,7 @@ public class ExplorersCompassItem extends Item {
 				ServerPlayNetworking.send(serverPlayer, SyncPacket.ID, new SyncPacket(canTeleport, maxNextSearches, hasInfiniteXp, allowedStructures, xpLevels, dimensionsForAllowedStructures, structureIDsToGroupIDs));
 			}
 		} else {
-			workerManager.stop();
-			workerManager.clear();
+			cancelSearch(player, -1);
 			ItemStack stack = player.getStackInHand(hand);
 			clearSearchData(stack);
 		}
@@ -104,9 +160,9 @@ public class ExplorersCompassItem extends Item {
 		return MathHelper.hsvToRgb(Math.max(0.0F, (1.0F - f) / 3.0F), 1.0F, 1.0F);
 	}
 
-	public void searchForStructure(ServerWorld world, PlayerEntity player, BlockPos pos, Identifier structureOrGroupId, boolean isGroup, ItemStack stack) {
+	public void searchForStructure(ServerWorld world, PlayerEntity player, BlockPos pos, Identifier structureOrGroupId, boolean isGroup, ItemStack stack, int requestId) {
 		if (!isBroken(stack)) {
-			setSearching(stack, structureOrGroupId, isGroup);
+
 
 			List<Identifier> structureIds;
 			if (isGroup) {
@@ -116,25 +172,33 @@ public class ExplorersCompassItem extends Item {
 			}
 
 			List<Structure> structures = new ArrayList<Structure>();
-			for (Identifier id : structureIds) {
+            structureIds = searchableInDimension(world, structureIds);
+			if (structureIds.isEmpty()) {
+                SearchResultPacket.send((ServerPlayerEntity) player, requestId, SearchResultPacket.WRONG_DIMENSION, 0);
+                return;
+            }
+            SearchSession session = beginSearch(player, stack, requestId);
+            setSearching(stack, structureOrGroupId, isGroup);
+            for (Identifier id : structureIds) {
 				structures.add(StructureUtils.getStructureForID(world, id));
 			}
 			List<BlockPos> prevPos = new ArrayList<BlockPos>();
-			workerManager.stop();
-			workerManager.createWorkers(world, player, stack, structures, structureOrGroupId, isGroup, pos, prevPos);
-			boolean started = workerManager.start();
+			session.workers.createWorkers(world, player, stack, structures, structureOrGroupId, isGroup, pos, prevPos);
+			boolean started = session.workers.start();
 			if (!started) {
-				fail(stack, structureOrGroupId, 0, 0);
+				fail(player, stack, structureOrGroupId, 0, 0);
 			}
 
 			int xpLevels = StructureUtils.getXpLevelsForStructure(world, structureOrGroupId);
 			if (!player.getAbilities().creativeMode && xpLevels > 0) {
 				player.addExperienceLevels(-xpLevels);
 			}
-		}
+		} else {
+            SearchResultPacket.send((ServerPlayerEntity) player, requestId, SearchResultPacket.REJECTED, 0);
+        }
 	}
 
-	public void searchForNextStructure(ServerWorld world, PlayerEntity player, BlockPos pos, ItemStack stack) {
+	public void searchForNextStructure(ServerWorld world, PlayerEntity player, BlockPos pos, ItemStack stack, int requestId) {
 		if (!isBroken(stack) && ItemUtils.verifyNBT(stack)) {
 			String structureIdStr = stack.getNbt().getString("StructureID");
 			List<BlockPos> prevPos = getPrevPos(stack);
@@ -148,33 +212,43 @@ public class ExplorersCompassItem extends Item {
 					// The compass will always store the ID of the specific structure that was found,
 					// even if the search itself was for a group, so we need to re-determine the group ID
 					Identifier groupId = StructureUtils.getStructureIDsToGroupIDs(world).get(structureId);
-					setSearching(stack, groupId, isGroup);
-					structureIds = StructureUtils.getStructuresForGroup(world, groupId);
+
+					structureIds = groupId == null ? List.of() : StructureUtils.getStructuresForGroup(world, groupId);
 				} else {
-					setSearching(stack, structureId, isGroup);
+
 					structureIds = List.of(structureId);
 				}
 
-				List<Structure> structures = new ArrayList<Structure>();
+	            structureIds = searchableInDimension(world, structureIds);
+			if (structureIds.isEmpty()) {
+                    SearchResultPacket.send((ServerPlayerEntity) player, requestId, SearchResultPacket.WRONG_DIMENSION, 0);
+                    return;
+                }
+                SearchSession session = beginSearch(player, stack, requestId);
+                setSearching(stack, isGroup ? StructureUtils.getStructureIDsToGroupIDs(world).get(structureId) : structureId, isGroup);
+                List<Structure> structures = new ArrayList<Structure>();
 				for (Identifier id : structureIds) {
 					structures.add(StructureUtils.getStructureForID(world, id));
 				}
-				workerManager.stop();
-				workerManager.createWorkers(world, player, stack, structures, structureId, isGroup, pos, prevPos);
-				boolean started = workerManager.start();
+				session.workers.createWorkers(world, player, stack, structures, structureId, isGroup, pos, prevPos);
+				boolean started = session.workers.start();
 				if (!started) {
-					fail(stack, structureId, 0, 0);
+					fail(player, stack, structureId, 0, 0);
 				}
 
 				int xpLevels = StructureUtils.getXpLevelsForStructure(world, structureId);
 				if (!player.getAbilities().creativeMode && xpLevels > 0) {
 					player.addExperienceLevels(-xpLevels);
 				}
-			}
-		}
+            } else {
+                SearchResultPacket.send((ServerPlayerEntity) player, requestId, SearchResultPacket.REJECTED, 0);
+            }
+		} else {
+            SearchResultPacket.send((ServerPlayerEntity) player, requestId, SearchResultPacket.REJECTED, 0);
+        }
 	}
 
-	public void succeed(ItemStack stack, Identifier structureID, boolean isGroup, int x, int z, List<BlockPos> prevPos, int samples, boolean displayCoordinates) {
+	public void succeed(PlayerEntity player, ItemStack stack, Identifier structureID, boolean isGroup, int x, int z, List<BlockPos> prevPos, int samples, boolean displayCoordinates) {
 		clearSearchData(stack);
 		if (ItemUtils.verifyNBT(stack)) {
 			stack.getNbt().putString("StructureID", structureID.toString());
@@ -187,20 +261,24 @@ public class ExplorersCompassItem extends Item {
 			setPrevPos(stack, prevPos);
 		}
 		damageCompass(stack);
-		workerManager.clear();
+		finishSearch(player, SearchResultPacket.FOUND, 0);
 	}
 
-	public void fail(ItemStack stack, Identifier structureId, int radius, int samples) {
-		workerManager.pop();
-		boolean started = workerManager.start();
+	public void fail(PlayerEntity player, ItemStack stack, Identifier structureId, int radius, int samples) {
+        SearchSession session = searches.get(player.getUuid());
+        if (session == null) return;
+        session.maxRadius = Math.max(session.maxRadius, radius);
+        session.workers.pop();
+        boolean started = session.workers.start();
 		if (!started) {
 			clearSearchData(stack);
 			if (ItemUtils.verifyNBT(stack)) {
 				stack.getNbt().putString("StructureID", structureId.toString());
 				stack.getNbt().putInt("State", CompassState.NOT_FOUND.getID());
-				stack.getNbt().putInt("SearchRadius", radius);
+				stack.getNbt().putInt("SearchRadius", session.maxRadius);
 				stack.getNbt().putInt("Samples", samples);
 			}
+            finishSearch(player, SearchResultPacket.NOT_FOUND, ExplorersCompassConfig.maxRadius);
 		}
 	}
 
