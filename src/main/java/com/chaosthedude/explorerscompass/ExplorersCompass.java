@@ -14,6 +14,7 @@ import com.chaosthedude.explorerscompass.network.SearchForNextPacket;
 import com.chaosthedude.explorerscompass.network.SearchPacket;
 import com.chaosthedude.explorerscompass.network.SearchListedPacket;
 import com.chaosthedude.explorerscompass.network.CancelSearchPacket;
+import com.chaosthedude.explorerscompass.network.ResetCompassPacket;
 import com.chaosthedude.explorerscompass.network.SyncPacket;
 import com.chaosthedude.explorerscompass.network.TeleportPacket;
 import com.google.common.collect.ArrayListMultimap;
@@ -56,6 +57,7 @@ public class ExplorersCompass implements ModInitializer {
 		ServerPlayNetworking.registerGlobalReceiver(SearchPacket.ID, SearchPacket::apply);
 		ServerPlayNetworking.registerGlobalReceiver(SearchListedPacket.ID, SearchListedPacket::apply);
 		ServerPlayNetworking.registerGlobalReceiver(CancelSearchPacket.ID, CancelSearchPacket::apply);
+		ServerPlayNetworking.registerGlobalReceiver(ResetCompassPacket.ID, ResetCompassPacket::apply);
         ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> EXPLORERS_COMPASS_ITEM.cancelSearch(handler.player, -1));
 		ServerPlayNetworking.registerGlobalReceiver(SearchForNextPacket.ID, SearchForNextPacket::apply);
 		ServerPlayNetworking.registerGlobalReceiver(TeleportPacket.ID, TeleportPacket::apply);

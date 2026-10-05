@@ -75,6 +75,16 @@ public class ExplorersCompassItem extends Item {
         }
     }
 
+	public void clearCompassTarget(ItemStack stack) {
+		clearSearchData(stack);
+	}
+
+	private void rejectWrongDimension(PlayerEntity player, ItemStack stack, int requestId) {
+		cancelSearch(player, -1);
+		clearCompassTarget(stack);
+		SearchResultPacket.send((ServerPlayerEntity) player, requestId, SearchResultPacket.WRONG_DIMENSION, 0);
+	}
+
     private void finishSearch(PlayerEntity player, int result, int radius) {
         finishSearch(player, result, radius, null, 0, 0, false);
     }
@@ -179,7 +189,7 @@ public class ExplorersCompassItem extends Item {
 			List<Structure> structures = new ArrayList<Structure>();
             structureIds = searchableInDimension(world, structureIds);
 			if (structureIds.isEmpty()) {
-                SearchResultPacket.send((ServerPlayerEntity) player, requestId, SearchResultPacket.WRONG_DIMENSION, 0);
+				rejectWrongDimension(player, stack, requestId);
                 return;
             }
             SearchSession session = beginSearch(player, stack, requestId);
@@ -216,7 +226,7 @@ public class ExplorersCompassItem extends Item {
         List<Identifier> uniqueIds = new ArrayList<>(new LinkedHashSet<>(requestedIds));
         List<Identifier> searchable = searchableInDimension(world, uniqueIds);
         if (searchable.size() != uniqueIds.size()) {
-            SearchResultPacket.send((ServerPlayerEntity) player, requestId, SearchResultPacket.WRONG_DIMENSION, 0);
+            rejectWrongDimension(player, stack, requestId);
             return;
         }
         List<Structure> structures = new ArrayList<>();
@@ -252,7 +262,7 @@ public class ExplorersCompassItem extends Item {
 
 	            structureIds = searchableInDimension(world, structureIds);
 			if (structureIds.isEmpty()) {
-                    SearchResultPacket.send((ServerPlayerEntity) player, requestId, SearchResultPacket.WRONG_DIMENSION, 0);
+					rejectWrongDimension(player, stack, requestId);
                     return;
                 }
                 SearchSession session = beginSearch(player, stack, requestId);
@@ -289,6 +299,7 @@ public class ExplorersCompassItem extends Item {
 			stack.getNbt().putBoolean("IsListed", isListed);
 			stack.getNbt().putInt("FoundX", x);
 			stack.getNbt().putInt("FoundZ", z);
+			stack.getNbt().putString("FoundDimension", player.getWorld().getRegistryKey().getValue().toString());
 			stack.getNbt().putInt("Samples", samples);
 			stack.getNbt().putBoolean("DisplayCoordinates", displayCoordinates);
 			setPrevPos(stack, prevPos);
@@ -424,6 +435,20 @@ public class ExplorersCompassItem extends Item {
 		return 0;
 	}
 
+	public Identifier getFoundDimension(ItemStack stack) {
+		if (!ItemUtils.verifyNBT(stack)) return null;
+		if (stack.getNbt().contains("FoundDimension")) return Identifier.tryParse(stack.getNbt().getString("FoundDimension"));
+		Identifier structureId = Identifier.tryParse(stack.getNbt().getString("StructureID"));
+		if (structureId == null || ExplorersCompass.allowedStructureIDsToDimensionIDs == null) return null;
+		List<Identifier> dimensions = ExplorersCompass.allowedStructureIDsToDimensionIDs.get(structureId);
+		return dimensions.stream().distinct().count() == 1 ? dimensions.get(0) : null;
+	}
+
+	public boolean isInFoundDimension(ItemStack stack, World world) {
+		Identifier dimension = getFoundDimension(stack);
+		return dimension == null || dimension.equals(world.getRegistryKey().getValue());
+	}
+
 	public Identifier getStructureID(ItemStack stack) {
 		if (ItemUtils.verifyNBT(stack)) {
 			return new Identifier(stack.getNbt().getString("StructureID"));
@@ -515,6 +540,7 @@ public class ExplorersCompassItem extends Item {
 			stack.getNbt().remove("StructureID");
 			stack.getNbt().remove("FoundX");
 			stack.getNbt().remove("FoundZ");
+			stack.getNbt().remove("FoundDimension");
 			stack.getNbt().remove("PrevPos");
 			stack.getNbt().remove("IsGroup");
 			stack.getNbt().remove("IsListed");

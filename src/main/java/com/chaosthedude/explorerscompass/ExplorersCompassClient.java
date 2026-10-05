@@ -17,6 +17,8 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
+import net.minecraft.client.MinecraftClient;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class ExplorersCompassClient implements ClientModInitializer {
 	
@@ -29,9 +31,15 @@ public class ExplorersCompassClient implements ClientModInitializer {
 			private double rotation;
 			private double rota;
 			private long lastUpdateTick;
+			private double randomRotation;
+			private double randomRota;
+			private long randomLastUpdateTick = Long.MIN_VALUE;
+			private long randomWobbleLastTick = Long.MIN_VALUE;
+			private double randomTarget;
 
 			@Override
 			public float unclampedCall(ItemStack stack, ClientWorld world, LivingEntity entityLiving, int seed) {
+				if (entityLiving == null && !stack.isInFrame()) entityLiving = MinecraftClient.getInstance().player;
 				if (entityLiving == null && !stack.isInFrame()) {
 					return 0.0F;
 				} else {
@@ -43,10 +51,17 @@ public class ExplorersCompassClient implements ClientModInitializer {
 
 					double rotation = entityExists ? (double) entity.getYaw() : getFrameRotation((ItemFrameEntity) entity);
 					rotation = rotation % 360.0D;
-					double adjusted = Math.PI - ((rotation - 90.0D) * 0.01745329238474369D - getAngle(world, entity, stack));
+					if (world == null) return 0.0F;
+					ExplorersCompassItem compass = (ExplorersCompassItem) stack.getItem();
+					boolean random = compass.getState(stack) != CompassState.FOUND || !compass.isInFoundDimension(stack, world);
+					if (random && world.getTime() != randomLastUpdateTick) {
+						randomLastUpdateTick = world.getTime();
+						randomTarget = ThreadLocalRandom.current().nextDouble() * Math.PI * 2.0D;
+					}
+					double adjusted = Math.PI - ((rotation - 90.0D) * 0.01745329238474369D - (random ? randomTarget : getAngle(world, entity, stack)));
 
 					if (entityExists) {
-						adjusted = wobble(world, adjusted);
+						adjusted = wobble(world, adjusted, random);
 					}
 
 					final float f = (float) (adjusted / (Math.PI * 2D));
@@ -54,7 +69,16 @@ public class ExplorersCompassClient implements ClientModInitializer {
 				}
 			}
 
-			private double wobble(ClientWorld world, double amount) {
+			private double wobble(ClientWorld world, double amount, boolean random) {
+				if (random) {
+					if (world.getTime() != randomWobbleLastTick) {
+						randomWobbleLastTick = world.getTime();
+						double delta = MathHelper.floorMod(amount - randomRotation + Math.PI, Math.PI * 2D) - Math.PI;
+						randomRota = (randomRota + MathHelper.clamp(delta, -1.0D, 1.0D) * 0.1D) * 0.8D;
+						randomRotation += randomRota;
+					}
+					return randomRotation;
+				}
 				if (world.getTime() != lastUpdateTick) {
 					lastUpdateTick = world.getTime();
 					double d0 = amount - rotation;
@@ -76,11 +100,7 @@ public class ExplorersCompassClient implements ClientModInitializer {
 				if (stack.getItem() == ExplorersCompass.EXPLORERS_COMPASS_ITEM) {
 					ExplorersCompassItem compassItem = (ExplorersCompassItem) stack.getItem();
 					BlockPos pos;
-					if (compassItem.getState(stack) == CompassState.FOUND) {
-						pos = new BlockPos(compassItem.getFoundStructureX(stack), 0, compassItem.getFoundStructureZ(stack));
-					} else {
-						pos = world.getSpawnPos();
-					}
+					pos = new BlockPos(compassItem.getFoundStructureX(stack), 0, compassItem.getFoundStructureZ(stack));
 					return Math.atan2((double) pos.getZ() - entity.getPos().z, (double) pos.getX() - entity.getPos().x);
 				}
 				return 0.0D;

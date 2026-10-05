@@ -26,6 +26,10 @@ public final class FilterSelections {
 		currentSelected = false;
 	}
 
+	public static boolean isEmpty() {
+		return sources.isEmpty() && dimensions.isEmpty() && groups.isEmpty();
+	}
+
 	public static boolean isCurrentSelected() {
 		return currentSelected;
 	}
