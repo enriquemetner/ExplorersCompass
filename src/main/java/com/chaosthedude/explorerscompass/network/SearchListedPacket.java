@@ -21,15 +21,17 @@ public class SearchListedPacket extends PacketByteBuf {
 
     public static final Identifier ID = new Identifier(ExplorersCompass.MODID, "search_listed");
 
-    public SearchListedPacket(List<Identifier> ids, int requestId) {
+	public SearchListedPacket(List<Identifier> ids, boolean excludeVisited, int requestId) {
         super(Unpooled.buffer());
-        writeInt(requestId);
+		writeInt(requestId);
+		writeBoolean(excludeVisited);
         writeVarInt(ids.size());
         for (Identifier id : ids) writeIdentifier(id);
     }
 
     public static void apply(MinecraftServer server, ServerPlayerEntity player, ServerPlayNetworkHandler handler, PacketByteBuf buf, PacketSender responseSender) {
-        int requestId = buf.readInt();
+		int requestId = buf.readInt();
+		boolean excludeVisited = buf.readBoolean();
         int count = buf.readVarInt();
         if (count < 1 || count > 32767) {
             server.execute(() -> SearchResultPacket.send(player, requestId, SearchResultPacket.REJECTED, 0));
@@ -44,7 +46,7 @@ public class SearchListedPacket extends PacketByteBuf {
                 return;
             }
             ((ExplorersCompassItem) stack.getItem()).searchForListedStructures((ServerWorld) player.getEntityWorld(), player,
-                    player.getBlockPos(), ids, stack, requestId);
+					player.getBlockPos(), ids, excludeVisited, stack, requestId);
         });
     }
 }

@@ -9,8 +9,8 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import com.chaosthedude.explorerscompass.config.ExplorersCompassConfig;
+import com.chaosthedude.explorerscompass.util.VisitedStructures;
 import com.chaosthedude.explorerscompass.items.ExplorersCompassItem;
-import com.chaosthedude.explorerscompass.network.SearchForNextPacket;
 import com.chaosthedude.explorerscompass.network.SearchPacket;
 import com.chaosthedude.explorerscompass.network.SearchListedPacket;
 import com.chaosthedude.explorerscompass.network.CancelSearchPacket;
@@ -24,6 +24,7 @@ import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.item.ItemGroups;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
@@ -39,7 +40,7 @@ public class ExplorersCompass implements ModInitializer {
 
 	public static boolean synced;
 	public static boolean canTeleport;
-	public static int maxNextSearches;
+	public static boolean canExcludeVisited;
 	public static boolean infiniteXp;
 	public static List<Identifier> allowedStructureIDs;
 	public static Map<Identifier, Integer> xpLevelsForAllowedStructures;
@@ -58,8 +59,15 @@ public class ExplorersCompass implements ModInitializer {
 		ServerPlayNetworking.registerGlobalReceiver(SearchListedPacket.ID, SearchListedPacket::apply);
 		ServerPlayNetworking.registerGlobalReceiver(CancelSearchPacket.ID, CancelSearchPacket::apply);
 		ServerPlayNetworking.registerGlobalReceiver(ResetCompassPacket.ID, ResetCompassPacket::apply);
-        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> EXPLORERS_COMPASS_ITEM.cancelSearch(handler.player, -1));
-		ServerPlayNetworking.registerGlobalReceiver(SearchForNextPacket.ID, SearchForNextPacket::apply);
+		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> EXPLORERS_COMPASS_ITEM.cancelSearch(handler.player, -1));
+		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> VisitedStructures.get(server).forgetPosition(handler.player.getUuid()));
+		ServerTickEvents.END_SERVER_TICK.register(server -> {
+			if (server.getPlayerManager().getPlayerList().isEmpty()) return;
+			VisitedStructures history = VisitedStructures.get(server);
+			for (net.minecraft.server.network.ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+				history.checkPlayer(player);
+			}
+		});
 		ServerPlayNetworking.registerGlobalReceiver(TeleportPacket.ID, TeleportPacket::apply);
 
 		allowedStructureIDs = new ArrayList<Identifier>();

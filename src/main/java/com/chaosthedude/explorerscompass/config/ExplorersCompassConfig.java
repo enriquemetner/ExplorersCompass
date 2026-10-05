@@ -25,7 +25,7 @@ public class ExplorersCompassConfig {
 	private static Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 
 	public static boolean allowTeleport = true;
-	public static int maxNextSearches = 100;
+	public static boolean allowExcludeVisited = true;
 	public static boolean displayCoordinates = true;
 	public static int maxRadius = 10000;
 	public static int maxSamples = 100000;
@@ -66,8 +66,8 @@ public class ExplorersCompassConfig {
 
 				Data data = gson.fromJson(reader, Data.class);
 
-				allowTeleport = data.common.allowTeleport;
-				maxNextSearches = data.common.maxNextSearches;
+					allowTeleport = data.common.allowTeleport;
+					allowExcludeVisited = data.common.allowExcludeVisited == null || data.common.allowExcludeVisited;
 				displayCoordinates = data.common.displayCoordinates;
 				maxRadius = data.common.maxRadius;
 				maxSamples = data.common.maxSamples;
@@ -100,7 +100,7 @@ public class ExplorersCompassConfig {
 	public static void save() {
 		try {
 			Writer writer = Files.newBufferedWriter(getFilePath());
-			Data data = new Data(new Data.Common(allowTeleport, maxNextSearches, displayCoordinates, maxRadius, maxSamples, compassDurability, defaultXpLevel, perStructureXpLevels, structureBlacklist), new Data.Client(displayWithChatOpen, pauseGameWhenOpen, clearFiltersOnClose, clearSearchBarOnClose, closeOnFound, checkedFiltersFirst, adjustRowsToFitView, translateStructureNames, overlayLineOffset, overlaySide, sortOrder, hiddenStructures));
+			Data data = new Data(new Data.Common(allowTeleport, allowExcludeVisited, displayCoordinates, maxRadius, maxSamples, compassDurability, defaultXpLevel, perStructureXpLevels, structureBlacklist), new Data.Client(displayWithChatOpen, pauseGameWhenOpen, clearFiltersOnClose, clearSearchBarOnClose, closeOnFound, checkedFiltersFirst, adjustRowsToFitView, translateStructureNames, overlayLineOffset, overlaySide, sortOrder, hiddenStructures));
 			gson.toJson(data, writer);
 			writer.close();
 		} catch (IOException e) {
@@ -128,9 +128,8 @@ public class ExplorersCompassConfig {
 		private static class Common {
 			private final String allowTeleportComment = "Allows a player to teleport to a located structure when in creative mode, opped, or in cheat mode.";
 			private final boolean allowTeleport;
-
-			private final String maxNextSearchesComment = "The maximum number of times a player can search for the next instance of a located structure, excluding already-found locations. Set to 0 to disable searching for additional structure instances and make the compass always locate the nearest instance.";
-			private final int maxNextSearches;
+			private final String allowExcludeVisitedComment = "Allows players to exclude visited structure instances from compass searches. Visits are recorded even when this is disabled.";
+			private final Boolean allowExcludeVisited;
 
 			private final String displayCoordinatesComment = "Allows players to view the precise coordinates and distance of a located structure on the HUD, rather than relying on the direction the compass is pointing.";
 			private final boolean displayCoordinates;
@@ -154,8 +153,8 @@ public class ExplorersCompassConfig {
 			private final List<String> structureBlacklist;
 
 			private Common() {
-				allowTeleport = true;
-				maxNextSearches = 100;
+					allowTeleport = true;
+					allowExcludeVisited = true;
 				displayCoordinates = true;
 				maxRadius = 10000;
 				maxSamples = 100000;
@@ -165,9 +164,9 @@ public class ExplorersCompassConfig {
 				structureBlacklist = new ArrayList<String>();
 			}
 
-			private Common(boolean allowTeleport, int maxNextSearches, boolean displayCoordinates, int maxRadius, int maxSamples, int compassDurability, int defaultXpLevel, Map<String, Integer> perStructureXpLevels, List<String> structureBlacklist) {
-				this.allowTeleport = allowTeleport;
-				this.maxNextSearches = maxNextSearches;
+			private Common(boolean allowTeleport, boolean allowExcludeVisited, boolean displayCoordinates, int maxRadius, int maxSamples, int compassDurability, int defaultXpLevel, Map<String, Integer> perStructureXpLevels, List<String> structureBlacklist) {
+					this.allowTeleport = allowTeleport;
+					this.allowExcludeVisited = allowExcludeVisited;
 				this.displayCoordinates = displayCoordinates;
 				this.maxRadius = maxRadius;
 				this.maxSamples = maxSamples;

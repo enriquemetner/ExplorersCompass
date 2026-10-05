@@ -6,6 +6,7 @@ import com.chaosthedude.explorerscompass.ExplorersCompass;
 import com.chaosthedude.explorerscompass.config.ExplorersCompassConfig;
 import com.chaosthedude.explorerscompass.items.ExplorersCompassItem;
 import com.chaosthedude.explorerscompass.util.StructureUtils;
+import com.chaosthedude.explorerscompass.util.VisitedStructures;
 import com.mojang.datafixers.util.Pair;
 
 import net.minecraft.entity.player.PlayerEntity;
@@ -33,21 +34,19 @@ public abstract class StructureSearchWorker<T extends StructurePlacement> implem
 	protected T placement;
 	protected List<Structure> structureSet;
 	protected Identifier structureOrGroupId;
-	protected boolean isGroup;
+	protected boolean excludeVisited;
 	protected int samples;
 	protected boolean finished;
 	protected int lastRadiusThreshold;
-	protected List<BlockPos> prevPos;
 
-	public StructureSearchWorker(ServerWorld level, PlayerEntity player, ItemStack stack, BlockPos startPos, List<BlockPos> prevPos, T placement, List<Structure> structureSet, Identifier structureOrGroupId, boolean isGroup, String managerId) {
+	public StructureSearchWorker(ServerWorld level, PlayerEntity player, ItemStack stack, BlockPos startPos, T placement, List<Structure> structureSet, Identifier structureOrGroupId, boolean excludeVisited, String managerId) {
 		this.level = level;
 		this.player = player;
 		this.stack = stack;
 		this.startPos = startPos;
-		this.prevPos = prevPos;
 		this.structureSet = structureSet;
 		this.structureOrGroupId = structureOrGroupId;
-		this.isGroup = isGroup;
+		this.excludeVisited = excludeVisited && ExplorersCompassConfig.allowExcludeVisited;
 		this.placement = placement;
 		this.managerId = managerId;
 
@@ -60,7 +59,7 @@ public abstract class StructureSearchWorker<T extends StructurePlacement> implem
 	public void start() {
 		if (!stack.isEmpty() && stack.getItem() == ExplorersCompass.EXPLORERS_COMPASS_ITEM) {
 			if (ExplorersCompassConfig.maxRadius > 0) {
-				ExplorersCompass.LOGGER.info("SearchWorkerManager " + managerId + ": " + getName() + " starting with " + (shouldLogRadius() ? ExplorersCompassConfig.maxRadius + " max radius, " : "") + ExplorersCompassConfig.maxSamples + " max samples, " + prevPos.size() + " previous locations");
+				ExplorersCompass.LOGGER.info("SearchWorkerManager " + managerId + ": " + getName() + " starting with " + (shouldLogRadius() ? ExplorersCompassConfig.maxRadius + " max radius, " : "") + ExplorersCompassConfig.maxSamples + " max samples");
 				WorldWorkerManager.addWorker(this);
 			} else {
 				fail();
@@ -70,7 +69,7 @@ public abstract class StructureSearchWorker<T extends StructurePlacement> implem
 
 	@Override
 	public boolean hasWork() {
-		return !finished && prevPos.size() <= ExplorersCompassConfig.maxNextSearches && getRadius() < ExplorersCompassConfig.maxRadius && samples < ExplorersCompassConfig.maxSamples;
+		return !finished && getRadius() < ExplorersCompassConfig.maxRadius && samples < ExplorersCompassConfig.maxSamples;
 	}
 
 	@Override
@@ -90,12 +89,13 @@ public abstract class StructureSearchWorker<T extends StructurePlacement> implem
 			StructurePresence result = level.getStructureAccessor().getStructurePresence(chunkPos, structure, false);
 			if (result != StructurePresence.START_NOT_PRESENT) {
 				if (result == StructurePresence.START_PRESENT) {
+					if (wasVisited(structure, chunkPos)) continue;
 					return Pair.of(placement.getLocatePos(chunkPos), structure);
 				}
 
 				Chunk chunk = level.getChunk(chunkPos.x, chunkPos.z, ChunkStatus.STRUCTURE_STARTS);
 				StructureStart structureStart = level.getStructureAccessor().getStructureStart(ChunkSectionPos.from(chunk), structure, chunk);
-				if (structureStart != null && structureStart.hasChildren()) {
+				if (structureStart != null && structureStart.hasChildren() && !wasVisited(structure, structureStart.getPos())) {
 					return Pair.of(placement.getLocatePos(structureStart.getPos()), structure);
 				}
 			}
@@ -104,18 +104,21 @@ public abstract class StructureSearchWorker<T extends StructurePlacement> implem
 		return null;
 	}
 
+	private boolean wasVisited(Structure structure, ChunkPos startChunk) {
+		if (!excludeVisited) return false;
+		Identifier structureId = StructureUtils.getIDForStructure(level, structure);
+		return structureId != null && VisitedStructures.get(level.getServer()).hasVisited(player.getUuid(),
+			level.getRegistryKey().getValue(), structureId, startChunk);
+	}
+
 	protected void succeed(BlockPos pos, Structure structure) {
 		ExplorersCompass.LOGGER.info("SearchWorkerManager " + managerId + ": " + getName() + " succeeded with " + (shouldLogRadius() ? getRadius() + " radius, " : "") + samples + " samples");
 		if (!stack.isEmpty() && stack.getItem() == ExplorersCompass.EXPLORERS_COMPASS_ITEM) {
-			((ExplorersCompassItem) stack.getItem()).succeed(player, stack, StructureUtils.getIDForStructure(level, structure), isGroup, pos.getX(), pos.getZ(), prevPos, samples, ExplorersCompassConfig.displayCoordinates);
+			((ExplorersCompassItem) stack.getItem()).succeed(player, stack, StructureUtils.getIDForStructure(level, structure), pos.getX(), pos.getZ(), samples, ExplorersCompassConfig.displayCoordinates);
 		} else {
 			ExplorersCompass.LOGGER.error("SearchWorkerManager " + managerId + ": " + getName() + " found invalid compass after successful search");
 		}
 		finished = true;
-	}
-
-	public boolean shouldIgnore(BlockPos pos) {
-		return prevPos.contains(pos);
 	}
 
 	protected void fail() {

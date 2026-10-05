@@ -22,8 +22,8 @@ public class ConcentricRingsSearchWorker extends StructureSearchWorker<Concentri
 	private double minDistance;
 	private Pair<BlockPos, Structure> closest;
 
-	public ConcentricRingsSearchWorker(ServerWorld level, PlayerEntity player, ItemStack stack, BlockPos startPos, List<BlockPos> prevPos, ConcentricRingsStructurePlacement placement, List<Structure> structureSet, Identifier structureOrGroupId, boolean isGroup, String managerId) {
-		super(level, player, stack, startPos, prevPos, placement, structureSet, structureOrGroupId, isGroup, managerId);
+	public ConcentricRingsSearchWorker(ServerWorld level, PlayerEntity player, ItemStack stack, BlockPos startPos, ConcentricRingsStructurePlacement placement, List<Structure> structureSet, Identifier structureOrGroupId, boolean excludeVisited, String managerId) {
+		super(level, player, stack, startPos, placement, structureSet, structureOrGroupId, excludeVisited, managerId);
 
 		minDistance = Double.MAX_VALUE;
 		chunkIndex = 0;
@@ -36,7 +36,7 @@ public class ConcentricRingsSearchWorker extends StructureSearchWorker<Concentri
 	public boolean hasWork() {
 		// Samples for this placement are not necessarily in order of closest to
 		// furthest, so disregard radius
-		return !finished && prevPos.size() <= ExplorersCompassConfig.maxNextSearches && samples < ExplorersCompassConfig.maxSamples && chunkIndex < potentialChunks.size();
+		return !finished && samples < ExplorersCompassConfig.maxSamples && chunkIndex < potentialChunks.size();
 	}
 
 	@Override
@@ -49,7 +49,7 @@ public class ConcentricRingsSearchWorker extends StructureSearchWorker<Concentri
 
 			if (closest == null || distance < minDistance) {
 				Pair<BlockPos, Structure> pair = getStructureGeneratingAt(chunkPos);
-				if (pair != null && !shouldIgnore(pair.getFirst())) {
+				if (pair != null) {
 					minDistance = distance;
 					closest = pair;
 				}
@@ -64,7 +64,6 @@ public class ConcentricRingsSearchWorker extends StructureSearchWorker<Concentri
 		}
 
 		if (closest != null) {
-			prevPos.add(closest.getFirst());
 			succeed(closest.getFirst(), closest.getSecond());
 		} else if (!finished) {
 			fail();

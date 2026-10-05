@@ -35,6 +35,10 @@ dependencies {
 
 loom {
 	runs {
+		client {
+			// Keep the same offline player UUID across development launches so per-player saves persist.
+			programArgs "--username", "Player1"
+		}
 		clientClean {
 			inherit client
 			runDir "run-clean"

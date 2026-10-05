@@ -30,7 +30,7 @@ public class SearchWorkerManager {
 		workers = new ArrayList<StructureSearchWorker<?>>();
 	}
 
-	public void createWorkers(ServerWorld world, PlayerEntity player, ItemStack stack, List<Structure> structures, Identifier structureOrGroupId, boolean isGroup, BlockPos startPos, List<BlockPos> prevPos) {
+	public void createWorkers(ServerWorld world, PlayerEntity player, ItemStack stack, List<Structure> structures, Identifier structureOrGroupId, boolean excludeVisited, BlockPos startPos) {
 		workers.clear();
 
 		Map<StructurePlacement, List<Structure>> placementToStructuresMap = new Object2ObjectArrayMap<>();
@@ -48,11 +48,11 @@ public class SearchWorkerManager {
 			List<Structure> placementStructures = entry.getValue();
 
 			if (placement instanceof ConcentricRingsStructurePlacement) {
-				workers.add(new ConcentricRingsSearchWorker(world, player, stack, startPos, prevPos, (ConcentricRingsStructurePlacement) placement, placementStructures, structureOrGroupId, isGroup, id));
+				workers.add(new ConcentricRingsSearchWorker(world, player, stack, startPos, (ConcentricRingsStructurePlacement) placement, placementStructures, structureOrGroupId, excludeVisited, id));
 			} else if (placement instanceof RandomSpreadStructurePlacement) {
-				workers.add(new RandomSpreadSearchWorker(world, player, stack, startPos, prevPos, (RandomSpreadStructurePlacement) placement, placementStructures, structureOrGroupId, isGroup, id));
+				workers.add(new RandomSpreadSearchWorker(world, player, stack, startPos, (RandomSpreadStructurePlacement) placement, placementStructures, structureOrGroupId, excludeVisited, id));
 			} else {
-				workers.add(new GenericSearchWorker(world, player, stack, startPos, prevPos, placement, placementStructures, structureOrGroupId, isGroup, id));
+				workers.add(new GenericSearchWorker(world, player, stack, startPos, placement, placementStructures, structureOrGroupId, excludeVisited, id));
 			}
 		}
 	}

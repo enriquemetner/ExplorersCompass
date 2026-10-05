@@ -20,10 +20,10 @@ public class SyncPacket extends PacketByteBuf {
 
 	public static final Identifier ID = new Identifier(ExplorersCompass.MODID, "sync");
 
-	public SyncPacket(boolean canTeleport, int maxNextSearches, boolean infiniteXp, List<Identifier> allowedStructureIDs, Map<Identifier, Integer> xpLevelsForAllowedStructures, ListMultimap<Identifier, Identifier> allowedStructureIDsToDimensionIDs, Map<Identifier, Identifier> structureIDsToGroupIDs) {
+	public SyncPacket(boolean canTeleport, boolean canExcludeVisited, boolean infiniteXp, List<Identifier> allowedStructureIDs, Map<Identifier, Integer> xpLevelsForAllowedStructures, ListMultimap<Identifier, Identifier> allowedStructureIDsToDimensionIDs, Map<Identifier, Identifier> structureIDsToGroupIDs) {
 		super(Unpooled.buffer());
 		writeBoolean(canTeleport);
-		writeInt(maxNextSearches);
+		writeBoolean(canExcludeVisited);
 		writeBoolean(infiniteXp);
 		writeInt(allowedStructureIDs.size());
 		for (Identifier structureID : allowedStructureIDs) {
@@ -42,7 +42,7 @@ public class SyncPacket extends PacketByteBuf {
 
 	public static void apply(MinecraftClient client, ClientPlayNetworkHandler handler, PacketByteBuf buf, PacketSender responseSender) {
 		final boolean canTeleport = buf.readBoolean();
-		final int maxNextSearches = buf.readInt();
+		final boolean canExcludeVisited = buf.readBoolean();
 		final boolean infiniteXp = buf.readBoolean();
 		final List<Identifier> allowedStructureIDs = new ArrayList<Identifier>();
 		final Map<Identifier, Integer> xpLevelsForAllowedStructures = new HashMap<Identifier, Integer>();
@@ -71,7 +71,7 @@ public class SyncPacket extends PacketByteBuf {
 		client.execute(() -> {
 			ExplorersCompass.synced = true;
 			ExplorersCompass.canTeleport = canTeleport;
-			ExplorersCompass.maxNextSearches = maxNextSearches;
+			ExplorersCompass.canExcludeVisited = canExcludeVisited;
 			ExplorersCompass.infiniteXp = infiniteXp;
 			ExplorersCompass.allowedStructureIDs = allowedStructureIDs;
 			ExplorersCompass.xpLevelsForAllowedStructures = xpLevelsForAllowedStructures;
