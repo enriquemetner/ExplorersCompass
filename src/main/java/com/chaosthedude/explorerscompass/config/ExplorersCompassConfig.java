@@ -38,6 +38,7 @@ public class ExplorersCompassConfig {
 	public static boolean displayWithChatOpen = true;
 	public static boolean pauseGameWhenOpen = false;
 	public static boolean clearFiltersOnClose = true;
+	public static boolean closeOnFound = true;
 	public static boolean checkedFiltersFirst = false;
 	public static boolean adjustRowsToFitView = true;
 	public static boolean translateStructureNames = true;
@@ -77,6 +78,7 @@ public class ExplorersCompassConfig {
 				displayWithChatOpen = data.client.displayWithChatOpen;
 				pauseGameWhenOpen = data.client.pauseGameWhenOpen;
 				clearFiltersOnClose = data.client.clearFiltersOnClose == null || data.client.clearFiltersOnClose;
+				closeOnFound = data.client.closeOnFound == null || data.client.closeOnFound;
 				checkedFiltersFirst = data.client.checkedFiltersFirst;
 				adjustRowsToFitView = data.client.adjustRowsToFitView == null || data.client.adjustRowsToFitView;
 				translateStructureNames = data.client.translateStructureNames;
@@ -96,7 +98,7 @@ public class ExplorersCompassConfig {
 	public static void save() {
 		try {
 			Writer writer = Files.newBufferedWriter(getFilePath());
-			Data data = new Data(new Data.Common(allowTeleport, maxNextSearches, displayCoordinates, maxRadius, maxSamples, compassDurability, defaultXpLevel, perStructureXpLevels, structureBlacklist), new Data.Client(displayWithChatOpen, pauseGameWhenOpen, clearFiltersOnClose, checkedFiltersFirst, adjustRowsToFitView, translateStructureNames, overlayLineOffset, overlaySide, sortOrder, hiddenStructures));
+			Data data = new Data(new Data.Common(allowTeleport, maxNextSearches, displayCoordinates, maxRadius, maxSamples, compassDurability, defaultXpLevel, perStructureXpLevels, structureBlacklist), new Data.Client(displayWithChatOpen, pauseGameWhenOpen, clearFiltersOnClose, closeOnFound, checkedFiltersFirst, adjustRowsToFitView, translateStructureNames, overlayLineOffset, overlaySide, sortOrder, hiddenStructures));
 			gson.toJson(data, writer);
 			writer.close();
 		} catch (IOException e) {
@@ -181,6 +183,7 @@ public class ExplorersCompassConfig {
 			private final boolean pauseGameWhenOpen;
 			private final String clearFiltersOnCloseComment = "Clears selected structure filters when the compass screen closes.";
 			private final Boolean clearFiltersOnClose;
+			private final Boolean closeOnFound;
 			private final String checkedFiltersFirstComment = "Displays checked filter options above unchecked options in each filter column.";
 			private final boolean checkedFiltersFirst;
 			private final String adjustRowsToFitViewComment = "Adjusts row spacing, showing less content but only fully visible list entries. Smooth scrolling may still show partial entries.";
@@ -201,6 +204,7 @@ public class ExplorersCompassConfig {
 				displayWithChatOpen = true;
 				pauseGameWhenOpen = false;
 				clearFiltersOnClose = true;
+				closeOnFound = true;
 				checkedFiltersFirst = false;
 				adjustRowsToFitView = true;
 				translateStructureNames = true;
@@ -210,10 +214,11 @@ public class ExplorersCompassConfig {
 			hiddenStructures = new ArrayList<String>();
 			}
 
-			private Client(boolean displayWithChatOpen, boolean pauseGameWhenOpen, boolean clearFiltersOnClose, boolean checkedFiltersFirst, boolean adjustRowsToFitView, boolean translateStructureNames, int overlayLineOffset, OverlaySide overlaySide, List<String> sortOrder, List<String> hiddenStructures) {
+			private Client(boolean displayWithChatOpen, boolean pauseGameWhenOpen, boolean clearFiltersOnClose, boolean closeOnFound, boolean checkedFiltersFirst, boolean adjustRowsToFitView, boolean translateStructureNames, int overlayLineOffset, OverlaySide overlaySide, List<String> sortOrder, List<String> hiddenStructures) {
 				this.displayWithChatOpen = displayWithChatOpen;
 				this.pauseGameWhenOpen = pauseGameWhenOpen;
 				this.clearFiltersOnClose = clearFiltersOnClose;
+				this.closeOnFound = closeOnFound;
 				this.checkedFiltersFirst = checkedFiltersFirst;
 				this.adjustRowsToFitView = adjustRowsToFitView;
 				this.translateStructureNames = translateStructureNames;

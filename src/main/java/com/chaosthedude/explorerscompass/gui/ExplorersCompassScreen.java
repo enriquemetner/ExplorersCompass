@@ -39,6 +39,7 @@ import net.minecraft.text.OrderedText;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.Language;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.world.World;
 
@@ -67,6 +68,7 @@ public class ExplorersCompassScreen extends Screen {
 		"string.explorerscompass.clearFiltersOnClose",
 		"string.explorerscompass.checkedFiltersFirst",
 		"string.explorerscompass.adjustRowsToFitView",
+        "string.explorerscompass.closeOnFound",
 		"string.explorerscompass.translateStructureNames",
         "string.explorerscompass.hiddenStructures"
 	};
@@ -88,6 +90,7 @@ public class ExplorersCompassScreen extends Screen {
 	private ButtonWidget translateNamesButton;
 	private ButtonWidget overlaySideButton;
 	private ButtonWidget clearOnCloseButton;
+	private ButtonWidget closeOnFoundButton;
 	private ButtonWidget checkedFiltersFirstButton;
 	private ButtonWidget adjustRowsToFitViewButton;
 	private ButtonWidget offsetDecreaseButton;
@@ -105,7 +108,7 @@ public class ExplorersCompassScreen extends Screen {
     private boolean hiddenStructuresOpen;
     private int hiddenScroll;
     private ButtonWidget hiddenStructuresButton;
-    private enum Dialog { NONE, WRONG_DIMENSION, SEARCHING, NOT_FOUND, REJECTED }
+    private enum Dialog { NONE, WRONG_DIMENSION, SEARCHING, FOUND, NOT_FOUND, REJECTED }
     private Dialog dialog = Dialog.NONE;
     private long dialogStarted;
     private long notFoundCompassUpdated;
@@ -116,6 +119,9 @@ public class ExplorersCompassScreen extends Screen {
     private Identifier searchedId;
     private boolean searchedGroup;
     private boolean successfulClose;
+    private int foundX;
+    private int foundZ;
+    private boolean showFoundCoordinates;
 	private double filterScroll;
 	private boolean draggingFilterScrollbar;
 	private double filterScrollbarGrabOffset;
@@ -708,6 +714,7 @@ public class ExplorersCompassScreen extends Screen {
 		translateNamesButton.setMessage(Text.translatable(ExplorersCompassConfig.translateStructureNames ? "options.on" : "options.off"));
 		clearOnCloseButton.setMessage(Text.translatable(ExplorersCompassConfig.clearFiltersOnClose ? "options.on" : "options.off"));
 		checkedFiltersFirstButton.setMessage(Text.translatable(ExplorersCompassConfig.checkedFiltersFirst ? "options.on" : "options.off"));
+		closeOnFoundButton.setMessage(Text.translatable(ExplorersCompassConfig.closeOnFound ? "options.on" : "options.off"));
 		adjustRowsToFitViewButton.setMessage(Text.translatable(ExplorersCompassConfig.adjustRowsToFitView ? "options.on" : "options.off"));
 		overlaySideButton.setMessage(Text.translatable(ExplorersCompassConfig.overlaySide == OverlaySide.LEFT
 				? "string.explorerscompass.left" : "string.explorerscompass.right"));
@@ -816,7 +823,14 @@ public class ExplorersCompassScreen extends Screen {
             if (dialog == Dialog.WRONG_DIMENSION) { dismissDialog(); return true; }
             if (button == 0) {
                 int x = dialogX(), y = dialogY(), w = dialogWidth();
+                if ((dialog == Dialog.FOUND || dialog == Dialog.NOT_FOUND)
+                        && (mouseX < x - 1 || mouseX >= x + w + 1 || mouseY < y - 1 || mouseY >= y + dialogHeight() + 1)) {
+                    dismissDialog();
+                    return true;
+                }
                 if (dialog == Dialog.SEARCHING && mouseX >= x + (w - 70) / 2 && mouseX < x + (w + 70) / 2 && mouseY >= y + 65 && mouseY < y + 85) dismissDialog();
+                else if (dialog == Dialog.FOUND && ExplorersCompass.canTeleport && mouseX >= x + (w - 100) / 2 && mouseX < x + (w + 100) / 2 && mouseY >= y + 94 && mouseY < y + 114) teleport();
+                else if (dialog == Dialog.FOUND && mouseX >= x + (w - 70) / 2 && mouseX < x + (w + 70) / 2 && mouseY >= y + (ExplorersCompass.canTeleport ? 117 : 94) && mouseY < y + (ExplorersCompass.canTeleport ? 137 : 114)) dismissDialog();
                 else if (dialog == Dialog.NOT_FOUND && mouseX >= x + (w - HIDE_BUTTON_WIDTH) / 2 && mouseX < x + (w + HIDE_BUTTON_WIDTH) / 2 && mouseY >= y + 52 && mouseY < y + 72) hideFailedSearch();
                 else if ((dialog == Dialog.NOT_FOUND || dialog == Dialog.REJECTED) && mouseX >= x + (w - 70) / 2 && mouseX < x + (w + 70) / 2 && mouseY >= y + (dialog == Dialog.NOT_FOUND ? 75 : 57) && mouseY < y + (dialog == Dialog.NOT_FOUND ? 95 : 77)) dismissDialog();
             }
@@ -1044,16 +1058,26 @@ public class ExplorersCompassScreen extends Screen {
 
     public void searchForNext() {
         if (foundStructureId == null) return;
-        boolean group = stack.hasNbt() && stack.getNbt().getBoolean("IsGroup");
+        ItemStack heldCompass = client.player == null ? ItemStack.EMPTY : ItemUtils.getHeldItem(client.player, ExplorersCompass.EXPLORERS_COMPASS_ITEM);
+        boolean group = heldCompass.hasNbt() && heldCompass.getNbt().getBoolean("IsGroup");
         Identifier id = group ? ExplorersCompass.structureIDsToGroupIDs.get(foundStructureId) : foundStructureId;
         if (beginSearch(id, group)) ClientPlayNetworking.send(SearchForNextPacket.ID, new SearchForNextPacket(activeRequestId));
     }
 
-    public void onSearchResult(int requestId, int result, int radius) {
+    public void onSearchResult(int requestId, int result, int radius, Identifier resultId, int foundX, int foundZ, boolean displayCoordinates) {
         if (dialog != Dialog.SEARCHING || activeRequestId != requestId) return;
         if (result == SearchResultPacket.FOUND) {
-            successfulClose = true;
-            client.setScreen(null);
+            if (ExplorersCompassConfig.closeOnFound) {
+                successfulClose = true;
+                client.setScreen(null);
+            } else {
+                foundStructureId = resultId;
+                this.foundX = foundX;
+                this.foundZ = foundZ;
+                showFoundCoordinates = displayCoordinates;
+                selectionList.refreshList(resultId);
+                dialog = Dialog.FOUND;
+            }
         } else if (result == SearchResultPacket.NOT_FOUND) {
             failedRadius = radius;
             notFoundCompassUpdated = System.nanoTime();
@@ -1095,11 +1119,41 @@ public class ExplorersCompassScreen extends Screen {
         if (dialog == Dialog.WRONG_DIMENSION) {
             return Math.min(width - 20, textRenderer.getWidth(Text.translatable("string.explorerscompass.wrongDimension")) + 12);
         }
+        if (dialog == Dialog.FOUND) {
+            int leftWidth = 0;
+            for (Text line : foundInfoLines()) leftWidth = Math.max(leftWidth, textRenderer.getWidth(line));
+            int contentWidth = leftWidth + 24;
+            if (showFoundCoordinates) {
+                int rightWidth = 0;
+                for (Text line : foundLocationLines()) rightWidth = Math.max(rightWidth, textRenderer.getWidth(line));
+                contentWidth = leftWidth + rightWidth + 36;
+            }
+            contentWidth = Math.max(245, contentWidth);
+            return Math.min(width - 20, contentWidth);
+        }
         return Math.min(width - 20, 245);
     }
-    private int dialogHeight() { return dialog == Dialog.WRONG_DIMENSION ? textRenderer.fontHeight + 12 : dialog == Dialog.SEARCHING ? 90 : dialog == Dialog.NOT_FOUND ? 100 : 80; }
+    private int dialogHeight() { return dialog == Dialog.WRONG_DIMENSION ? textRenderer.fontHeight + 12 : dialog == Dialog.SEARCHING ? 90 : dialog == Dialog.FOUND ? (ExplorersCompass.canTeleport ? 142 : 119) : dialog == Dialog.NOT_FOUND ? 100 : 80; }
     private int dialogX() { return (width - dialogWidth()) / 2; }
     private int dialogY() { return (height - dialogHeight()) / 2; }
+
+    private Text[] foundInfoLines() {
+        Identifier groupId = foundStructureId == null ? null : ExplorersCompass.structureIDsToGroupIDs.get(foundStructureId);
+        return new Text[] {
+            Text.translatable("string.explorerscompass.name").append(": ").append(Text.literal(StructureUtils.getStructureName(foundStructureId)).formatted(Formatting.GRAY)),
+            Text.translatable("string.explorerscompass.source").append(": ").append(Text.literal(StructureUtils.getStructureSource(foundStructureId)).formatted(Formatting.GRAY)),
+            Text.translatable("string.explorerscompass.group").append(": ").append(Text.literal(StructureUtils.getStructureName(groupId)).formatted(Formatting.GRAY))
+        };
+    }
+
+    private Text[] foundLocationLines() {
+        int distance = client.player == null ? 0 : StructureUtils.getHorizontalDistanceToLocation(client.player, foundX, foundZ);
+        return new Text[] {
+            Text.translatable("string.explorerscompass.distance").append(": ").append(Text.literal(Integer.toString(distance)).formatted(Formatting.GRAY)),
+            Text.translatable("string.explorerscompass.coordinates").append(":"),
+            Text.literal(foundX + ", " + foundZ).formatted(Formatting.GRAY)
+        };
+    }
 
     private void drawDialogButton(DrawContext context, String label, int x, int y, int w, int mouseX, int mouseY) {
         context.fill(x, y, x + w, y + 20, 0xff909090);
@@ -1124,6 +1178,37 @@ public class ExplorersCompassScreen extends Screen {
                 ? ((ExplorersCompassItem) heldCompass.getItem()).getSearchRadius(heldCompass) : 0;
             context.drawCenteredTextWithShadow(textRenderer, Text.translatable("string.explorerscompass.distance").getString() + ": " + distance, x + w / 2, y + 47, 0xffffff);
             drawDialogButton(context, Text.translatable("string.explorerscompass.back").getString(), x + (w - 70) / 2, y + 65, 70, mouseX, mouseY);
+        } else if (dialog == Dialog.FOUND) {
+            double yaw = client.player == null ? 0.0D : client.player.getYaw() % 360.0D;
+            double targetAngle = client.player == null ? 0.0D : Math.atan2(foundZ - client.player.getZ(), foundX - client.player.getX());
+            double angle = MathHelper.floorMod((Math.PI - ((yaw - 90.0D) * (Math.PI / 180.0D) - targetAngle)) / (Math.PI * 2.0D), 1.0D);
+            int frame = (16 + (int)Math.floor(angle * 32.0D + 0.5D)) % 32;
+            Identifier texture = new Identifier(ExplorersCompass.MODID, String.format(Locale.ROOT, "textures/item/explorerscompass_%02d.png", frame));
+            context.drawTexture(texture, x + (w - 16) / 2, y + 10, 16, 16, 0, 0, 16, 16, 16, 16);
+            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("string.explorerscompass.structureFound"), x + w / 2, y + 32, 0xffffff);
+            Text[] lines = foundInfoLines();
+            Text[] locationLines = showFoundCoordinates ? foundLocationLines() : new Text[0];
+            int leftWidth = w - 24;
+            int rightWidth = 0;
+            for (Text line : locationLines) rightWidth = Math.max(rightWidth, textRenderer.getWidth(line));
+            if (showFoundCoordinates) {
+                int leftWanted = 0;
+                for (Text line : lines) leftWanted = Math.max(leftWanted, textRenderer.getWidth(line));
+                int available = Math.max(2, w - 36);
+                leftWidth = Math.min(leftWanted, Math.max(1, available - Math.min(rightWidth, available / 2)));
+                rightWidth = Math.min(rightWidth, Math.max(1, available - leftWidth));
+            }
+            int rightX = x + w - 12 - rightWidth;
+            for (int i = 0; i < lines.length; i++) {
+                context.drawTextWithShadow(textRenderer, Language.getInstance().reorder(textRenderer.trimToWidth(lines[i], leftWidth)), x + 12, y + 50 + i * 12, 0xffffff);
+            }
+            for (int i = 0; i < locationLines.length; i++) {
+                context.drawTextWithShadow(textRenderer, Language.getInstance().reorder(textRenderer.trimToWidth(locationLines[i], rightWidth)), rightX, y + 50 + i * 12, 0xffffff);
+            }
+            if (ExplorersCompass.canTeleport) {
+                drawDialogButton(context, Text.translatable("string.explorerscompass.teleport").getString(), x + (w - 100) / 2, y + 94, 100, mouseX, mouseY);
+            }
+            drawDialogButton(context, Text.translatable("string.explorerscompass.back").getString(), x + (w - 70) / 2, y + (ExplorersCompass.canTeleport ? 117 : 94), 70, mouseX, mouseY);
         } else {
             Text message = dialog == Dialog.WRONG_DIMENSION ? Text.translatable("string.explorerscompass.wrongDimension")
                 : dialog == Dialog.NOT_FOUND ? Text.translatable("string.explorerscompass.notFoundWithin", failedRadius)
@@ -1317,7 +1402,7 @@ public class ExplorersCompassScreen extends Screen {
 			updateSettingsButtonLabels();
 			filterScroll = MathHelper.clamp(filterScroll, 0, filterMaxScroll());
 		}));
-		translateNamesButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(6), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), (onPress) -> {
+		translateNamesButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(7), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), (onPress) -> {
 			ExplorersCompassConfig.translateStructureNames = !ExplorersCompassConfig.translateStructureNames;
 			ExplorersCompassConfig.save();
 			updateSettingsButtonLabels();
@@ -1333,8 +1418,13 @@ public class ExplorersCompassScreen extends Screen {
 			filterScroll = MathHelper.clamp(filterScroll, 0, filterMaxScroll());
 			updateSettingsButtonLabels();
 		}));
+		closeOnFoundButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(6), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), button -> {
+			ExplorersCompassConfig.closeOnFound = !ExplorersCompassConfig.closeOnFound;
+			ExplorersCompassConfig.save();
+			updateSettingsButtonLabels();
+		}));
 		updateSettingsButtonLabels();
-        hiddenStructuresButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(7), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.translatable("string.explorerscompass.open"), button -> {
+        hiddenStructuresButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(8), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.translatable("string.explorerscompass.open"), button -> {
             settingsOpen = false;
             hiddenStructuresOpen = true;
             hiddenScroll = 0;
@@ -1394,7 +1484,7 @@ public class ExplorersCompassScreen extends Screen {
 		cancelButton.setX(width - 30);
 		settingsButton.setY(height - 30);
         hiddenStructuresButton.setX(settingsControlX());
-        hiddenStructuresButton.setY(settingsRowY(7));
+        hiddenStructuresButton.setY(settingsRowY(8));
 		if (width >= 480) {
 			teleportButton.setX(cancelButton.getX() - teleportButton.getWidth() - 5);
 			teleportButton.setY(10);
@@ -1415,6 +1505,7 @@ public class ExplorersCompassScreen extends Screen {
 		clearFiltersButton.visible = isStructureView();
 		settingsButton.visible = isStructureView();
         hiddenStructuresButton.visible = settingsOpen;
+		closeOnFoundButton.visible = settingsOpen;
 		chatOverlayButton.visible = settingsOpen;
 		translateNamesButton.visible = settingsOpen;
 		offsetDecreaseButton.visible = settingsOpen;
