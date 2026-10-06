@@ -27,7 +27,6 @@ public class ExplorersCompassConfig {
 	public static boolean allowTeleport = true;
 	public static boolean allowExcludeVisited = true;
 	public static boolean displayCoordinates = true;
-	public static int maxRadius = 30000;
 	public static int maxSamples = 100000;
 	public static int compassDurability = 0;
 	public static int defaultXpCost = 0;
@@ -69,7 +68,6 @@ public class ExplorersCompassConfig {
 					allowTeleport = data.common.allowTeleport;
 					allowExcludeVisited = data.common.allowExcludeVisited == null || data.common.allowExcludeVisited;
 				displayCoordinates = data.common.displayCoordinates;
-				maxRadius = data.common.maxRadius;
 				maxSamples = data.common.maxSamples;
 				compassDurability = data.common.compassDurability;
 				defaultXpCost = data.common.defaultXpCost;
@@ -100,7 +98,7 @@ public class ExplorersCompassConfig {
 	public static void save() {
 		try {
 			Writer writer = Files.newBufferedWriter(getFilePath());
-			Data data = new Data(new Data.Common(allowTeleport, allowExcludeVisited, displayCoordinates, maxRadius, maxSamples, compassDurability, defaultXpCost, allowSearchWithoutEnoughXp, structureBlacklist), new Data.Client(displayWithChatOpen, pauseGameWhenOpen, clearFiltersOnClose, clearSearchBarOnClose, closeOnFound, checkedFiltersFirst, adjustRowsToFitView, translateStructureNames, overlayLineOffset, overlaySide, sortOrder, hiddenStructures));
+			Data data = new Data(new Data.Common(allowTeleport, allowExcludeVisited, displayCoordinates, maxSamples, compassDurability, defaultXpCost, allowSearchWithoutEnoughXp, structureBlacklist), new Data.Client(displayWithChatOpen, pauseGameWhenOpen, clearFiltersOnClose, clearSearchBarOnClose, closeOnFound, checkedFiltersFirst, adjustRowsToFitView, translateStructureNames, overlayLineOffset, overlaySide, sortOrder, hiddenStructures));
 			gson.toJson(data, writer);
 			writer.close();
 		} catch (IOException e) {
@@ -134,9 +132,6 @@ public class ExplorersCompassConfig {
 			private final String displayCoordinatesComment = "Allows players to view the precise coordinates and distance of a located structure on the HUD, rather than relying on the direction the compass is pointing.";
 			private final boolean displayCoordinates;
 
-			private final String maxRadiusComment = "The maximum radius that will be searched for a structure. Raising this value will increase search accuracy but will potentially make the process more resource intensive.";
-			private final int maxRadius;
-
 			private final String maxSamplesComment = "The maximum number of samples to be taken when searching for a structure.";
 			private final int maxSamples;
 
@@ -157,7 +152,6 @@ public class ExplorersCompassConfig {
 					allowTeleport = true;
 					allowExcludeVisited = true;
 				displayCoordinates = true;
-				maxRadius = 30000;
 				maxSamples = 100000;
 				compassDurability = 0;
 				defaultXpCost = 0;
@@ -165,11 +159,10 @@ public class ExplorersCompassConfig {
 				structureBlacklist = new ArrayList<String>();
 			}
 
-			private Common(boolean allowTeleport, boolean allowExcludeVisited, boolean displayCoordinates, int maxRadius, int maxSamples, int compassDurability, int defaultXpCost, boolean allowSearchWithoutEnoughXp, List<String> structureBlacklist) {
+			private Common(boolean allowTeleport, boolean allowExcludeVisited, boolean displayCoordinates, int maxSamples, int compassDurability, int defaultXpCost, boolean allowSearchWithoutEnoughXp, List<String> structureBlacklist) {
 					this.allowTeleport = allowTeleport;
 					this.allowExcludeVisited = allowExcludeVisited;
 				this.displayCoordinates = displayCoordinates;
-				this.maxRadius = maxRadius;
 				this.maxSamples = maxSamples;
 				this.compassDurability = compassDurability;
 				this.defaultXpCost = defaultXpCost;

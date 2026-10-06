@@ -38,6 +38,7 @@ public abstract class StructureSearchWorker<T extends StructurePlacement> implem
 	protected int samples;
 	protected boolean finished;
 	protected int lastRadiusThreshold;
+	protected int radiusLimit = ExplorersCompassItem.INITIAL_SEARCH_RADIUS;
 
 	public StructureSearchWorker(ServerWorld level, PlayerEntity player, ItemStack stack, BlockPos startPos, T placement, List<Structure> structureSet, Identifier structureOrGroupId, boolean excludeVisited, String managerId) {
 		this.level = level;
@@ -58,18 +59,22 @@ public abstract class StructureSearchWorker<T extends StructurePlacement> implem
 
 	public void start() {
 		if (!stack.isEmpty() && stack.getItem() == ExplorersCompass.EXPLORERS_COMPASS_ITEM) {
-			if (ExplorersCompassConfig.maxRadius > 0) {
-				ExplorersCompass.LOGGER.info("SearchWorkerManager " + managerId + ": " + getName() + " starting with " + (shouldLogRadius() ? ExplorersCompassConfig.maxRadius + " max radius, " : "") + ExplorersCompassConfig.maxSamples + " max samples");
-				WorldWorkerManager.addWorker(this);
-			} else {
-				fail();
-			}
+			ExplorersCompass.LOGGER.info("SearchWorkerManager " + managerId + ": " + getName() + " starting with " + (shouldLogRadius() ? radiusLimit + " radius limit, " : "") + ExplorersCompassConfig.maxSamples + " max samples");
+			WorldWorkerManager.addWorker(this);
 		}
+	}
+
+	public void setRadiusLimit(int radiusLimit) {
+		this.radiusLimit = radiusLimit;
+	}
+
+	public boolean canWorkAt(int radiusLimit) {
+		return !finished && samples < ExplorersCompassConfig.maxSamples && getRadius() < radiusLimit;
 	}
 
 	@Override
 	public boolean hasWork() {
-		return !finished && getRadius() < ExplorersCompassConfig.maxRadius && samples < ExplorersCompassConfig.maxSamples;
+		return canWorkAt(radiusLimit);
 	}
 
 	@Override
@@ -127,8 +132,8 @@ public abstract class StructureSearchWorker<T extends StructurePlacement> implem
 			((ExplorersCompassItem) stack.getItem()).fail(player, stack, structureOrGroupId, getRadius(), samples);
 		} else {
 			ExplorersCompass.LOGGER.error("SearchWorkerManager " + managerId + ": " + getName() + " found invalid compass after failed search");
+			finished = true;
 		}
-		finished = true;
 	}
 
 	public void stop() {

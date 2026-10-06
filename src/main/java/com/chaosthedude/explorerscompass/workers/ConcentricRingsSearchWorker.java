@@ -1,8 +1,11 @@
 package com.chaosthedude.explorerscompass.workers;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 import com.chaosthedude.explorerscompass.config.ExplorersCompassConfig;
+import com.chaosthedude.explorerscompass.util.StructureUtils;
 import com.mojang.datafixers.util.Pair;
 
 import net.minecraft.entity.player.PlayerEntity;
@@ -27,16 +30,27 @@ public class ConcentricRingsSearchWorker extends StructureSearchWorker<Concentri
 
 		minDistance = Double.MAX_VALUE;
 		chunkIndex = 0;
-		potentialChunks = level.getChunkManager().getStructurePlacementCalculator().getPlacementPositions(placement);
+		List<ChunkPos> positions = level.getChunkManager().getStructurePlacementCalculator().getPlacementPositions(placement);
+		potentialChunks = positions == null ? List.of() : new ArrayList<>(positions);
+		potentialChunks.sort(Comparator.comparingInt(this::distanceToChunk));
 
-		finished = !level.getServer().getSaveProperties().getGeneratorOptions().shouldGenerateStructures() || potentialChunks == null || potentialChunks.isEmpty();
+		finished = !level.getServer().getSaveProperties().getGeneratorOptions().shouldGenerateStructures() || potentialChunks.isEmpty();
+	}
+
+	private int distanceToChunk(ChunkPos chunkPos) {
+		return StructureUtils.getHorizontalDistanceToLocation(startPos,
+			ChunkSectionPos.getOffsetPos(chunkPos.x, 8), ChunkSectionPos.getOffsetPos(chunkPos.z, 8));
+	}
+
+	@Override
+	public boolean canWorkAt(int radiusLimit) {
+		return !finished && samples < ExplorersCompassConfig.maxSamples && chunkIndex < potentialChunks.size()
+			&& distanceToChunk(potentialChunks.get(chunkIndex)) < radiusLimit;
 	}
 
 	@Override
 	public boolean hasWork() {
-		// Samples for this placement are not necessarily in order of closest to
-		// furthest, so disregard radius
-		return !finished && samples < ExplorersCompassConfig.maxSamples && chunkIndex < potentialChunks.size();
+		return canWorkAt(radiusLimit);
 	}
 
 	@Override

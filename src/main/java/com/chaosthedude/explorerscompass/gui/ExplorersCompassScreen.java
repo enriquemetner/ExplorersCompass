@@ -18,6 +18,7 @@ import com.chaosthedude.explorerscompass.items.ExplorersCompassItem;
 import com.chaosthedude.explorerscompass.network.SearchPacket;
 import com.chaosthedude.explorerscompass.network.SearchListedPacket;
 import com.chaosthedude.explorerscompass.network.CancelSearchPacket;
+import com.chaosthedude.explorerscompass.network.ContinueSearchPacket;
 import com.chaosthedude.explorerscompass.network.SearchResultPacket;
 import com.chaosthedude.explorerscompass.network.ResetCompassPacket;
 import com.chaosthedude.explorerscompass.network.TeleportPacket;
@@ -63,6 +64,8 @@ public class ExplorersCompassScreen extends Screen {
 	private static final int SETTINGS_CONTROL_WIDTH = 90;
 	private static String sessionSearchText = "";
 	private static final int HIDE_BUTTON_WIDTH = 100;
+	private static final int KEEP_SEARCHING_BUTTON_WIDTH = 100;
+	private static final int NOT_FOUND_BUTTON_GAP = 5;
 	private static final String[] SETTINGS_LABEL_KEYS = {
 		"string.explorerscompass.overlaySide",
 		"string.explorerscompass.overlayLineOffset",
@@ -123,6 +126,7 @@ public class ExplorersCompassScreen extends Screen {
     private double notFoundCompassSpeed;
     private int activeRequestId;
     private int failedRadius;
+    private boolean failedCanContinue;
     private Identifier searchedId;
     private boolean searchedGroup;
     private boolean searchedListed;
@@ -186,7 +190,7 @@ public class ExplorersCompassScreen extends Screen {
 
 	@Override
 	public void removed() {
-        if (dialog == Dialog.SEARCHING && !successfulClose && client.getNetworkHandler() != null) {
+        if ((dialog == Dialog.SEARCHING || (dialog == Dialog.NOT_FOUND && failedCanContinue)) && !successfulClose && client.getNetworkHandler() != null) {
             ClientPlayNetworking.send(CancelSearchPacket.ID, new CancelSearchPacket(activeRequestId));
         }
 		if (ExplorersCompassConfig.clearFiltersOnClose) {
@@ -869,7 +873,8 @@ public class ExplorersCompassScreen extends Screen {
                 if (dialog == Dialog.SEARCHING && mouseX >= x + (w - 70) / 2 && mouseX < x + (w + 70) / 2 && mouseY >= y + searchingBackY() && mouseY < y + searchingBackY() + 20) dismissDialog();
                 else if (dialog == Dialog.FOUND && ExplorersCompass.canTeleport && mouseX >= x + (w - 100) / 2 && mouseX < x + (w + 100) / 2 && mouseY >= y + 94 && mouseY < y + 114) teleport();
                 else if (dialog == Dialog.FOUND && mouseX >= x + (w - 70) / 2 && mouseX < x + (w + 70) / 2 && mouseY >= y + (ExplorersCompass.canTeleport ? 117 : 94) && mouseY < y + (ExplorersCompass.canTeleport ? 137 : 114)) dismissDialog();
-                else if (dialog == Dialog.NOT_FOUND && mouseX >= x + (w - HIDE_BUTTON_WIDTH) / 2 && mouseX < x + (w + HIDE_BUTTON_WIDTH) / 2 && mouseY >= y + notFoundHideY() && mouseY < y + notFoundHideY() + 20) hideFailedSearch();
+                else if (dialog == Dialog.NOT_FOUND && failedCanContinue && mouseX >= notFoundKeepX() && mouseX < notFoundKeepX() + KEEP_SEARCHING_BUTTON_WIDTH && mouseY >= y + notFoundHideY() && mouseY < y + notFoundHideY() + 20) keepSearching();
+                else if (dialog == Dialog.NOT_FOUND && mouseX >= notFoundHideX() && mouseX < notFoundHideX() + HIDE_BUTTON_WIDTH && mouseY >= y + notFoundHideY() && mouseY < y + notFoundHideY() + 20) hideFailedSearch();
                 else if ((dialog == Dialog.NOT_FOUND || dialog == Dialog.REJECTED) && mouseX >= x + (w - 70) / 2 && mouseX < x + (w + 70) / 2 && mouseY >= y + (dialog == Dialog.NOT_FOUND ? notFoundBackY() : 57) && mouseY < y + (dialog == Dialog.NOT_FOUND ? notFoundBackY() : 57) + 20) dismissDialog();
             }
             return true;
@@ -1166,7 +1171,7 @@ public class ExplorersCompassScreen extends Screen {
         ClientPlayNetworking.send(SearchListedPacket.ID, new SearchListedPacket(eligible, FilterSelections.excludeVisited(), activeRequestId));
     }
 
-    public void onSearchResult(int requestId, int result, int radius, Identifier resultId, int foundX, int foundZ, boolean displayCoordinates) {
+    public void onSearchResult(int requestId, int result, int radius, boolean canContinue, Identifier resultId, int foundX, int foundZ, boolean displayCoordinates) {
         if (dialog != Dialog.SEARCHING || activeRequestId != requestId) return;
         if (result == SearchResultPacket.FOUND) {
             if (ExplorersCompassConfig.closeOnFound) {
@@ -1182,6 +1187,7 @@ public class ExplorersCompassScreen extends Screen {
             }
         } else if (result == SearchResultPacket.NOT_FOUND) {
             failedRadius = radius;
+            failedCanContinue = canContinue;
             notFoundCompassUpdated = System.nanoTime();
             notFoundCompassAngle = 0.0D;
             notFoundCompassSpeed = 0.0D;
@@ -1221,10 +1227,18 @@ public class ExplorersCompassScreen extends Screen {
     }
 
     private void dismissDialog() {
-        if (dialog == Dialog.SEARCHING && client.getNetworkHandler() != null) {
+        if ((dialog == Dialog.SEARCHING || (dialog == Dialog.NOT_FOUND && failedCanContinue)) && client.getNetworkHandler() != null) {
             ClientPlayNetworking.send(CancelSearchPacket.ID, new CancelSearchPacket(activeRequestId));
         }
         dialog = Dialog.NONE;
+    }
+
+    private void keepSearching() {
+        if (!failedCanContinue || dialog != Dialog.NOT_FOUND || client.getNetworkHandler() == null) return;
+        failedCanContinue = false;
+        dialog = Dialog.SEARCHING;
+        dialogStarted = System.currentTimeMillis();
+        ClientPlayNetworking.send(ContinueSearchPacket.ID, new ContinueSearchPacket(activeRequestId));
     }
 
     private void hideFailedSearch() {
@@ -1271,6 +1285,8 @@ public class ExplorersCompassScreen extends Screen {
     }
     private int searchingBackY() { return searchedListed ? (listedSkippedCount > 0 ? 89 : 77) : 65; }
     private int notFoundHideY() { return searchedListed ? (listedSkippedCount > 0 ? 78 : 66) : 52; }
+    private int notFoundKeepX() { return dialogX() + (dialogWidth() - KEEP_SEARCHING_BUTTON_WIDTH - NOT_FOUND_BUTTON_GAP - HIDE_BUTTON_WIDTH) / 2; }
+    private int notFoundHideX() { return notFoundKeepX() + KEEP_SEARCHING_BUTTON_WIDTH + NOT_FOUND_BUTTON_GAP; }
     private int notFoundBackY() { return notFoundHideY() + 23; }
     private Text wrongDimensionCountText() { return Text.translatable(listedSkippedCount == 1 ? "string.explorerscompass.wrongDimensionCountOne" : "string.explorerscompass.wrongDimensionCount", listedSkippedCount); }
     private int dialogHeight() { return dialog == Dialog.WRONG_DIMENSION ? textRenderer.fontHeight + 12 : dialog == Dialog.INSUFFICIENT_XP ? textRenderer.fontHeight * 2 + 16 : dialog == Dialog.SEARCHING ? searchingBackY() + 25 : dialog == Dialog.FOUND ? (ExplorersCompass.canTeleport ? 142 : 119) : dialog == Dialog.NOT_FOUND ? notFoundBackY() + 25 : 80; }
@@ -1301,9 +1317,13 @@ public class ExplorersCompassScreen extends Screen {
     }
 
     private void drawDialogButton(DrawContext context, String label, int x, int y, int w, int mouseX, int mouseY) {
-        context.fill(x, y, x + w, y + 20, 0xff909090);
-        context.fill(x + 1, y + 1, x + w - 1, y + 19, mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + 20 ? 0xff424242 : 0xff242424);
-        context.drawCenteredTextWithShadow(textRenderer, label, x + w / 2, y + 6, 0xffffff);
+        drawDialogButton(context, label, x, y, w, mouseX, mouseY, true);
+    }
+
+    private void drawDialogButton(DrawContext context, String label, int x, int y, int w, int mouseX, int mouseY, boolean enabled) {
+        context.fill(x, y, x + w, y + 20, enabled ? 0xff909090 : 0xff505050);
+        context.fill(x + 1, y + 1, x + w - 1, y + 19, enabled && mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + 20 ? 0xff424242 : 0xff242424);
+        context.drawCenteredTextWithShadow(textRenderer, label, x + w / 2, y + 6, enabled ? 0xffffff : 0xff808080);
     }
 
     private boolean insideQuestionIcon(int mouseX, int mouseY, int iconX, int iconY) {
@@ -1430,9 +1450,10 @@ public class ExplorersCompassScreen extends Screen {
                     context.drawCenteredTextWithShadow(textRenderer, Text.translatable("string.explorerscompass.structuresSelected", listedSelectedCount), x + w / 2, y + 47, 0xffffff);
                     if (listedSkippedCount > 0) context.drawCenteredTextWithShadow(textRenderer, wrongDimensionCountText(), x + w / 2, y + 59, 0xffffff);
                 }
-                int hideX = x + (w - HIDE_BUTTON_WIDTH) / 2;
+                int hideX = notFoundHideX();
                 int iconX = hideX + HIDE_BUTTON_WIDTH - 12;
                 int iconY = y + notFoundHideY() + 10;
+                drawDialogButton(context, Text.translatable("string.explorerscompass.keepSearching").getString(), notFoundKeepX(), y + notFoundHideY(), KEEP_SEARCHING_BUTTON_WIDTH, mouseX, mouseY, failedCanContinue);
                 drawDialogButton(context, Text.translatable(searchedListed ? "string.explorerscompass.hideAll" : "string.explorerscompass.hide").getString(), hideX, y + notFoundHideY(), HIDE_BUTTON_WIDTH, mouseX, mouseY);
                 drawQuestionIcon(context, iconX, iconY);
                 if (insideQuestionIcon(mouseX, mouseY, iconX, iconY)) drawQuestionTooltip(context, searchedListed ? "string.explorerscompass.hideAll.tooltip" : "string.explorerscompass.hide.tooltip", mouseX, mouseY);

@@ -24,6 +24,7 @@ public class GenericSearchWorker extends StructureSearchWorker<StructurePlacemen
 	public int length;
 	public double nextLength;
 	public Direction direction;
+	private boolean pendingCandidate;
 
 	public GenericSearchWorker(ServerWorld level, PlayerEntity player, ItemStack stack, BlockPos startPos, StructurePlacement placement, List<Structure> structureSet, Identifier structureOrGroupId, boolean excludeVisited, String managerId) {
 		super(level, player, stack, startPos, placement, structureSet, structureOrGroupId, excludeVisited, managerId);
@@ -37,18 +38,26 @@ public class GenericSearchWorker extends StructureSearchWorker<StructurePlacemen
 	@Override
 	public boolean doWork() {
 		if (hasWork()) {
-			if (direction == Direction.NORTH) {
-				chunkZ--;
-			} else if (direction == Direction.EAST) {
-				chunkX++;
-			} else if (direction == Direction.SOUTH) {
-				chunkZ++;
-			} else if (direction == Direction.WEST) {
-				chunkX--;
+			if (!pendingCandidate) {
+				if (direction == Direction.NORTH) {
+					chunkZ--;
+				} else if (direction == Direction.EAST) {
+					chunkX++;
+				} else if (direction == Direction.SOUTH) {
+					chunkZ++;
+				} else if (direction == Direction.WEST) {
+					chunkX--;
+				}
 			}
 
 			ChunkPos chunkPos = new ChunkPos(chunkX, chunkZ);
 			currentPos = new BlockPos(ChunkSectionPos.getOffsetPos(chunkPos.x, 8), 0, ChunkSectionPos.getOffsetPos(chunkPos.z, 8));
+			if (getRadius() >= radiusLimit) {
+				pendingCandidate = true;
+				fail();
+				return false;
+			}
+			pendingCandidate = false;
 
 			Pair<BlockPos, Structure> pair = getStructureGeneratingAt(chunkPos);
 			if (pair != null) {

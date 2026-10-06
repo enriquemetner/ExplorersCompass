@@ -8,6 +8,7 @@
     "_comment": "STRINGS - BUTTONS",
     "string.explorerscompass.back": "Back",
     "string.explorerscompass.searchListed": "Search Listed",
+    "string.explorerscompass.keepSearching": "Keep Searching",
     "string.explorerscompass.searchListed.tooltip": "Searches for any structure from the current list after applied filters and search bar results.",
     "string.explorerscompass.selectStructure": "Select Structure",
     "string.explorerscompass.teleport": "Teleport",

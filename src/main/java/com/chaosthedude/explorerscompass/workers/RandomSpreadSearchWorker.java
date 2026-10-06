@@ -54,6 +54,10 @@ public class RandomSpreadSearchWorker extends StructureSearchWorker<RandomSpread
 
 				ChunkPos chunkPos = placement.getStartChunk(level.getSeed(), sampleX, sampleZ);
 				currentPos = new BlockPos(ChunkSectionPos.getOffsetPos(chunkPos.x, 8), 0, ChunkSectionPos.getOffsetPos(chunkPos.z, 8));
+				if (getRadius() >= radiusLimit) {
+					fail();
+					return false;
+				}
 
 				Pair<BlockPos, Structure> pair = getStructureGeneratingAt(chunkPos);
 				samples++;

@@ -25,6 +25,8 @@ public class SearchWorkerManager {
 	private final String id = RandomStringUtils.random(8, "0123456789abcdef");
 
 	private List<StructureSearchWorker<?>> workers;
+	// Keep workers and their cursors across radius stages; index advances within the current stage.
+	private int index;
 
 	public SearchWorkerManager() {
 		workers = new ArrayList<StructureSearchWorker<?>>();
@@ -32,6 +34,7 @@ public class SearchWorkerManager {
 
 	public void createWorkers(ServerWorld world, PlayerEntity player, ItemStack stack, List<Structure> structures, Identifier structureOrGroupId, boolean excludeVisited, BlockPos startPos) {
 		workers.clear();
+		index = 0;
 
 		Map<StructurePlacement, List<Structure>> placementToStructuresMap = new Object2ObjectArrayMap<>();
 
@@ -57,19 +60,26 @@ public class SearchWorkerManager {
 		}
 	}
 
+	public void setRadiusLimit(int radiusLimit) {
+		for (StructureSearchWorker<?> worker : workers) worker.setRadiusLimit(radiusLimit);
+		index = 0;
+	}
+
 	// Returns true if a worker starts, false otherwise
 	public boolean start() {
-		if (!workers.isEmpty()) {
-			workers.get(0).start();
-			return true;
+		while (index < workers.size()) {
+			StructureSearchWorker<?> worker = workers.get(index);
+			if (worker.hasWork()) {
+				worker.start();
+				return true;
+			}
+			index++;
 		}
 		return false;
 	}
 
 	public void pop() {
-		if (!workers.isEmpty()) {
-			workers.remove(0);
-		}
+		index++;
 	}
 
 	public void stop() {
@@ -80,6 +90,7 @@ public class SearchWorkerManager {
 
 	public void clear() {
 		workers.clear();
+		index = 0;
 	}
 
 }

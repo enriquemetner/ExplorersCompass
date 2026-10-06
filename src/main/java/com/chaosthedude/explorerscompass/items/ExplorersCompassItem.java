@@ -38,6 +38,9 @@ import net.minecraft.world.gen.structure.Structure;
 public class ExplorersCompassItem extends Item {
 
 	public static final String NAME = "explorerscompass";
+	public static final int INITIAL_SEARCH_RADIUS = 10000;
+	public static final int SEARCH_RADIUS_STEP = 20000;
+	public static final int MAX_SEARCH_RADIUS = 50000;
 
 	private final Map<UUID, SearchSession> searches = new HashMap<>();
 
@@ -46,17 +49,22 @@ public class ExplorersCompassItem extends Item {
         final ItemStack stack;
         final NbtCompound previousNbt;
         final int requestId;
-        int maxRadius;
-        SearchSession(ItemStack stack, int requestId) {
+        final ServerWorld world;
+        final Identifier searchId;
+        int radiusLimit = INITIAL_SEARCH_RADIUS;
+        boolean awaitingContinuation;
+        SearchSession(ServerWorld world, ItemStack stack, int requestId, Identifier searchId) {
+            this.world = world;
             this.stack = stack;
             this.previousNbt = stack.hasNbt() ? stack.getNbt().copy() : null;
             this.requestId = requestId;
+            this.searchId = searchId;
         }
     }
 
-    private SearchSession beginSearch(PlayerEntity player, ItemStack stack, int requestId) {
+    private SearchSession beginSearch(ServerWorld world, PlayerEntity player, ItemStack stack, int requestId, Identifier searchId) {
         cancelSearch(player, -1);
-        SearchSession session = new SearchSession(stack, requestId);
+        SearchSession session = new SearchSession(world, stack, requestId, searchId);
         searches.put(player.getUuid(), session);
         return session;
     }
@@ -198,12 +206,13 @@ public class ExplorersCompassItem extends Item {
                 return;
             }
 			if (rejectIfInsufficientXp(player, requestId)) return;
-            SearchSession session = beginSearch(player, stack, requestId);
+            SearchSession session = beginSearch(world, player, stack, requestId, structureOrGroupId);
             setSearching(stack, structureOrGroupId);
             for (Identifier id : structureIds) {
 				structures.add(StructureUtils.getStructureForID(world, id));
 			}
 			session.workers.createWorkers(world, player, stack, structures, structureOrGroupId, excludeVisited, pos);
+			session.workers.setRadiusLimit(session.radiusLimit);
 			boolean started = session.workers.start();
 			if (!started) {
 				fail(player, stack, structureOrGroupId, 0, 0);
@@ -233,12 +242,37 @@ public class ExplorersCompassItem extends Item {
 		if (rejectIfInsufficientXp(player, requestId)) return;
         List<Structure> structures = new ArrayList<>();
         for (Identifier id : searchable) structures.add(StructureUtils.getStructureForID(world, id));
-        SearchSession session = beginSearch(player, stack, requestId);
         Identifier firstId = searchable.get(0);
+        SearchSession session = beginSearch(world, player, stack, requestId, firstId);
         setSearching(stack, firstId);
 		session.workers.createWorkers(world, player, stack, structures, firstId, excludeVisited, pos);
+        session.workers.setRadiusLimit(session.radiusLimit);
         if (!session.workers.start()) fail(player, stack, firstId, 0, 0);
     }
+
+	public void continueSearch(ServerWorld world, PlayerEntity player, ItemStack stack, int requestId) {
+		SearchSession session = searches.get(player.getUuid());
+		if (session == null || !session.awaitingContinuation || session.requestId != requestId
+				|| session.stack != stack || isBroken(stack) || session.radiusLimit >= MAX_SEARCH_RADIUS) {
+			SearchResultPacket.send((ServerPlayerEntity) player, requestId, SearchResultPacket.REJECTED, 0);
+			return;
+		}
+		if (session.world != world) {
+			rejectWrongDimension(player, stack, requestId);
+			return;
+		}
+		if (rejectIfInsufficientXp(player, requestId)) {
+			cancelSearch(player, requestId);
+			return;
+		}
+		session.awaitingContinuation = false;
+		int previousRadiusLimit = session.radiusLimit;
+		session.radiusLimit = Math.min(MAX_SEARCH_RADIUS, session.radiusLimit + SEARCH_RADIUS_STEP);
+		session.workers.setRadiusLimit(session.radiusLimit);
+		setSearching(stack, session.searchId);
+		setSearchRadius(stack, previousRadiusLimit);
+		if (!session.workers.start()) fail(player, stack, session.searchId, 0, 0);
+	}
 
 	public void succeed(PlayerEntity player, ItemStack stack, Identifier structureID, int x, int z, int samples, boolean displayCoordinates) {
 		SearchSession session = searches.get(player.getUuid());
@@ -266,19 +300,24 @@ public class ExplorersCompassItem extends Item {
 
 	public void fail(PlayerEntity player, ItemStack stack, Identifier structureId, int radius, int samples) {
         SearchSession session = searches.get(player.getUuid());
-        if (session == null) return;
-        session.maxRadius = Math.max(session.maxRadius, radius);
+        if (session == null || session.awaitingContinuation) return;
         session.workers.pop();
         boolean started = session.workers.start();
 		if (!started) {
 			clearSearchData(stack);
 			if (ItemUtils.verifyNBT(stack)) {
-				stack.getNbt().putString("StructureID", structureId.toString());
+				stack.getNbt().putString("StructureID", session.searchId.toString());
 				stack.getNbt().putInt("State", CompassState.NOT_FOUND.getID());
-				stack.getNbt().putInt("SearchRadius", session.maxRadius);
+				stack.getNbt().putInt("SearchRadius", session.radiusLimit);
 				stack.getNbt().putInt("Samples", samples);
 			}
-            finishSearch(player, SearchResultPacket.NOT_FOUND, ExplorersCompassConfig.maxRadius);
+			boolean canContinue = session.radiusLimit < MAX_SEARCH_RADIUS;
+			if (canContinue) {
+				session.awaitingContinuation = true;
+				SearchResultPacket.send((ServerPlayerEntity) player, session.requestId, SearchResultPacket.NOT_FOUND, session.radiusLimit, true);
+			} else {
+				finishSearch(player, SearchResultPacket.NOT_FOUND, session.radiusLimit);
+			}
 		}
 	}
 
@@ -349,7 +388,7 @@ public class ExplorersCompassItem extends Item {
 
 	public void setSearchRadius(ItemStack stack, int searchRadius) {
 		if (ItemUtils.verifyNBT(stack)) {
-			stack.getNbt().putInt("SearchRadius", searchRadius);
+			stack.getNbt().putInt("SearchRadius", Math.max(stack.getNbt().getInt("SearchRadius"), searchRadius));
 		}
 	}
 
