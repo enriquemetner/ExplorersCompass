@@ -236,18 +236,22 @@ public class ExplorersCompassScreen extends Screen {
 		if (searchTextField != null) sessionSearchText = searchTextField.getText();
 		clearChildren();
 		setupButtons();
-		selectionList = new StructureSearchList(this, client, player, foundStructureId, 130, 40, width - 130 - SCROLLBAR_WIDTH, height - 50, 50);
+		selectionList = new StructureSearchList(this, client, player, null, 130, 40, width - 130 - SCROLLBAR_WIDTH, height - 50, 50);
 		if (isStructureView()) {
 			addDrawableChild(selectionList);
 		}
 		setupTextFields();
 		rebuildFilterOptions();
 		processSearchTerm();
+		focusActiveSearchField();
 	}
 
 	@Override
 	public void tick() {
-        if ((dialog == Dialog.WRONG_DIMENSION || dialog == Dialog.INSUFFICIENT_XP) && System.currentTimeMillis() - dialogStarted >= 3000) dialog = Dialog.NONE;
+        if ((dialog == Dialog.WRONG_DIMENSION || dialog == Dialog.INSUFFICIENT_XP) && System.currentTimeMillis() - dialogStarted >= 3000) {
+			dialog = Dialog.NONE;
+			focusActiveSearchField();
+		}
 		searchTextField.tick();
 		filterSearchTextField.tick();
 		hiddenSearchTextField.tick();
@@ -267,7 +271,7 @@ public class ExplorersCompassScreen extends Screen {
 			remove(selectionList);
 			allowedStructureIDs = new ArrayList<Identifier>(ExplorersCompass.allowedStructureIDs);
 			structureIDsMatchingSearch = new ArrayList<Identifier>(allowedStructureIDs);
-			selectionList = new StructureSearchList(this, client, player, foundStructureId, 130, 40, width - 130 - SCROLLBAR_WIDTH, height - 50, 50);
+			selectionList = new StructureSearchList(this, client, player, null, 130, 40, width - 130 - SCROLLBAR_WIDTH, height - 50, 50);
 			if (isStructureView()) {
 				addDrawableChild(selectionList);
 			}
@@ -278,6 +282,7 @@ public class ExplorersCompassScreen extends Screen {
 			updateViewButtons();
 			rebuildFilterOptions();
 			processSearchTerm();
+			focusActiveSearchField();
 
 			ExplorersCompass.synced = false;
 		}
@@ -859,6 +864,14 @@ public class ExplorersCompassScreen extends Screen {
 
 	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
+		try {
+			return handleMouseClicked(mouseX, mouseY, button);
+		} finally {
+			if (client.currentScreen == this && dialog == Dialog.NONE) focusActiveSearchField();
+		}
+	}
+
+	private boolean handleMouseClicked(double mouseX, double mouseY, int button) {
         if (dialog != Dialog.NONE) {
             if (dialog == Dialog.WRONG_DIMENSION || dialog == Dialog.INSUFFICIENT_XP) { dismissDialog(); return true; }
             if (button == 0) {
@@ -883,7 +896,6 @@ public class ExplorersCompassScreen extends Screen {
 				super.mouseClicked(mouseX, mouseY, 0);
 				field.setText("");
 				field.setFocused(true);
-				if (field == searchTextField) processSearchTerm();
 				return true;
 			}
 		}
@@ -941,6 +953,25 @@ public class ExplorersCompassScreen extends Screen {
 		return null;
 	}
 
+	private TransparentTextField activeSearchField() {
+		if (hiddenStructuresOpen) return hiddenSearchTextField;
+		if (filtersOpen) return filterSearchTextField;
+		return settingsOpen ? null : searchTextField;
+	}
+
+	private void focusActiveSearchField() {
+		TransparentTextField active = activeSearchField();
+		for (TransparentTextField field : new TransparentTextField[] {searchTextField, filterSearchTextField, hiddenSearchTextField}) {
+			if (field != null && field != active) field.setFocused(false);
+		}
+		if (active == null) {
+			setFocused(null);
+		} else if (getFocused() != active || !active.isFocused()) {
+			setFocused(active);
+			active.setFocused(true);
+		}
+	}
+
 	@Override
 	public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
 		if (draggedScrollbar != null && button == 0) {
@@ -982,6 +1013,20 @@ public class ExplorersCompassScreen extends Screen {
             if (par1 == 256) dismissDialog();
             return true;
         }
+		if (isStructureView() && !sortMenuOpen) {
+			if (par1 == 264 || par1 == 265) {
+				selectionList.selectRelative(par1 == 264 ? 1 : -1);
+				focusActiveSearchField();
+				return true;
+			}
+			if (par1 == 257 || par1 == 335) {
+				StructureSearchEntry entry = selectionList.hasSelection()
+						? selectionList.getSelectedOrNull() : selectionList.soleSearchableEntry();
+				if (entry != null && !isStructureHidden(entry.getStructureID())) entry.searchForStructure();
+				if (dialog == Dialog.NONE) focusActiveSearchField();
+				return true;
+			}
+		}
         if (hiddenStructuresOpen && par1 == 256) {
             leaveHiddenStructures();
             return true;
@@ -999,10 +1044,7 @@ public class ExplorersCompassScreen extends Screen {
 			return true;
 		}
 		boolean ret = super.keyPressed(par1, par2, par3);
-		if (searchTextField.isFocused()) {
-			processSearchTerm();
-			return true;
-		}
+		focusActiveSearchField();
 		return ret;
 	}
 
@@ -1010,10 +1052,7 @@ public class ExplorersCompassScreen extends Screen {
 	public boolean charTyped(char typedChar, int keyCode) {
 		if (dialog != Dialog.NONE) return true;
 		boolean ret = super.charTyped(typedChar, keyCode);
-		if (searchTextField.isFocused()) {
-			processSearchTerm();
-			return true;
-		}
+		focusActiveSearchField();
 		return ret;
 	}
 
@@ -1049,7 +1088,10 @@ public class ExplorersCompassScreen extends Screen {
 			closeSortMenu();
 		}
 		filtersOpen = open;
-		if (open) pendingHiddenStructures.clear();
+		if (open) {
+			pendingHiddenStructures.clear();
+			selectionList.setSelected(null);
+		}
 		draggedScrollbar = null;
 		searchTextField.setVisible(isStructureView());
 		searchTextField.setFocused(false);
@@ -1062,6 +1104,7 @@ public class ExplorersCompassScreen extends Screen {
 			processSearchTerm();
 		}
 		updateViewButtons();
+		focusActiveSearchField();
 	}
 
 	private void setSettingsOpen(boolean open) {
@@ -1072,7 +1115,10 @@ public class ExplorersCompassScreen extends Screen {
 			closeSortMenu();
 		}
 		settingsOpen = open;
-		if (open) pendingHiddenStructures.clear();
+		if (open) {
+			pendingHiddenStructures.clear();
+			selectionList.setSelected(null);
+		}
 		draggedScrollbar = null;
 		searchTextField.setVisible(isStructureView());
 		searchTextField.setFocused(false);
@@ -1083,6 +1129,7 @@ public class ExplorersCompassScreen extends Screen {
 			processSearchTerm();
 		}
 		updateViewButtons();
+		focusActiveSearchField();
 	}
 
 	private boolean isStructureView() {
@@ -1164,7 +1211,7 @@ public class ExplorersCompassScreen extends Screen {
                 this.foundX = foundX;
                 this.foundZ = foundZ;
                 showFoundCoordinates = displayCoordinates;
-                selectionList.refreshList(resultId);
+				selectionList.refreshList(true);
                 dialog = Dialog.FOUND;
             }
         } else if (result == SearchResultPacket.NOT_FOUND) {
@@ -1208,11 +1255,12 @@ public class ExplorersCompassScreen extends Screen {
         dialogStarted = System.currentTimeMillis();
     }
 
-    private void dismissDialog() {
+	private void dismissDialog() {
         if ((dialog == Dialog.SEARCHING || (dialog == Dialog.NOT_FOUND && failedCanContinue)) && client.getNetworkHandler() != null) {
             ClientPlayNetworking.send(CancelSearchPacket.ID, new CancelSearchPacket(activeRequestId));
         }
-        dialog = Dialog.NONE;
+		dialog = Dialog.NONE;
+		focusActiveSearchField();
     }
 
     private void keepSearching() {
@@ -1660,6 +1708,7 @@ public class ExplorersCompassScreen extends Screen {
             hiddenStructuresOpen = true;
             hiddenScroll = 0;
             updateViewButtons();
+			focusActiveSearchField();
         }));
 
 		cancelButton = addDrawableChild(new TransparentButton(width - 30, 10, 20, 20, Text.literal(""), (onPress) -> {
@@ -1697,6 +1746,7 @@ public class ExplorersCompassScreen extends Screen {
 		int availableWidth = Math.max(0, rightButtonX - searchX - SEARCH_TELEPORT_GAP);
 		searchTextField = new TransparentTextField(textRenderer, searchX, 10, Math.min(SEARCH_FIELD_WIDTH, availableWidth), 20, Text.translatable("string.explorerscompass.search"));
 		searchTextField.setText(sessionSearchText);
+		searchTextField.setChangedListener(value -> processSearchTerm());
 		addDrawableChild(searchTextField);
 		searchTextField.setVisible(isStructureView());
 		int filterSearchX = 20 + textRenderer.getWidth(Text.translatable("string.explorerscompass.filters"));
@@ -1731,6 +1781,7 @@ public class ExplorersCompassScreen extends Screen {
 		hiddenSearchTextField.setFocused(false);
 		hiddenScroll = 0;
 		updateViewButtons();
+		focusActiveSearchField();
 	}
 
 	private void positionFilterButtons() {

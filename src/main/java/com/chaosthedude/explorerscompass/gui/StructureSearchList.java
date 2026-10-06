@@ -11,6 +11,7 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.widget.AlwaysSelectedEntryListWidget;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.math.MathHelper;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
@@ -135,8 +136,9 @@ public class StructureSearchList extends AlwaysSelectedEntryListWidget<Structure
         }
     }
 
-    public void refreshList(Identifier structureIdToSelect) {
+	public void refreshList(Identifier structureIdToSelect) {
 		clearEntries();
+		setSelected(null);
 		for (Identifier id : parentScreen.sortStructures()) {
 			StructureSearchEntry entry = new StructureSearchEntry(this, id);
 			addEntry(entry);
@@ -158,6 +160,28 @@ public class StructureSearchList extends AlwaysSelectedEntryListWidget<Structure
 
 	public boolean hasSelection() {
 		return getSelectedOrNull() != null;
+	}
+
+	public void selectRelative(int direction) {
+		if (getEntryCount() == 0) return;
+		int selectedIndex = hasSelection() ? children().indexOf(getSelectedOrNull()) : -1;
+		int nextIndex = selectedIndex < 0 ? 0 : MathHelper.clamp(selectedIndex + direction, 0, getEntryCount() - 1);
+		setSelected(getEntry(nextIndex));
+		if (getRowTop(nextIndex) < top) {
+			setScrollAmount(getScrollAmount() - (top - getRowTop(nextIndex)));
+		} else if (getRowBottom(nextIndex) > fullRowsBottom()) {
+			setScrollAmount(getScrollAmount() + getRowBottom(nextIndex) - fullRowsBottom());
+		}
+	}
+
+	public StructureSearchEntry soleSearchableEntry() {
+		StructureSearchEntry only = null;
+		for (StructureSearchEntry entry : children()) {
+			if (parentScreen.isStructureHidden(entry.getStructureID())) continue;
+			if (only != null) return null;
+			only = entry;
+		}
+		return only;
 	}
 
 	public boolean isActionButtonClick(StructureSearchEntry entry, double mouseX, double mouseY) {
