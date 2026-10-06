@@ -7,7 +7,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -16,6 +15,7 @@ import com.chaosthedude.explorerscompass.ExplorersCompass;
 import com.chaosthedude.explorerscompass.util.OverlaySide;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.annotations.SerializedName;
 
 import net.fabricmc.loader.api.FabricLoader;
 
@@ -30,8 +30,8 @@ public class ExplorersCompassConfig {
 	public static int maxRadius = 30000;
 	public static int maxSamples = 100000;
 	public static int compassDurability = 0;
-	public static int defaultXpLevel = 0;
-	public static Map<String, Integer> perStructureXpLevels = new HashMap<String, Integer>();
+	public static int defaultXpCost = 0;
+	public static boolean allowSearchWithoutEnoughXp = false;
 	public static List<String> structureBlacklist = new ArrayList<String>();
 	public static List<String> hiddenStructures = new ArrayList<String>();
 
@@ -72,8 +72,8 @@ public class ExplorersCompassConfig {
 				maxRadius = data.common.maxRadius;
 				maxSamples = data.common.maxSamples;
 				compassDurability = data.common.compassDurability;
-				defaultXpLevel = data.common.defaultXpLevel;
-				perStructureXpLevels = data.common.perStructureXpLevels;
+				defaultXpCost = data.common.defaultXpCost;
+				allowSearchWithoutEnoughXp = data.common.allowSearchWithoutEnoughXp != null && data.common.allowSearchWithoutEnoughXp;
 				structureBlacklist = data.common.structureBlacklist;
 
 				displayWithChatOpen = data.client.displayWithChatOpen;
@@ -100,7 +100,7 @@ public class ExplorersCompassConfig {
 	public static void save() {
 		try {
 			Writer writer = Files.newBufferedWriter(getFilePath());
-			Data data = new Data(new Data.Common(allowTeleport, allowExcludeVisited, displayCoordinates, maxRadius, maxSamples, compassDurability, defaultXpLevel, perStructureXpLevels, structureBlacklist), new Data.Client(displayWithChatOpen, pauseGameWhenOpen, clearFiltersOnClose, clearSearchBarOnClose, closeOnFound, checkedFiltersFirst, adjustRowsToFitView, translateStructureNames, overlayLineOffset, overlaySide, sortOrder, hiddenStructures));
+			Data data = new Data(new Data.Common(allowTeleport, allowExcludeVisited, displayCoordinates, maxRadius, maxSamples, compassDurability, defaultXpCost, allowSearchWithoutEnoughXp, structureBlacklist), new Data.Client(displayWithChatOpen, pauseGameWhenOpen, clearFiltersOnClose, clearSearchBarOnClose, closeOnFound, checkedFiltersFirst, adjustRowsToFitView, translateStructureNames, overlayLineOffset, overlaySide, sortOrder, hiddenStructures));
 			gson.toJson(data, writer);
 			writer.close();
 		} catch (IOException e) {
@@ -143,11 +143,12 @@ public class ExplorersCompassConfig {
 			private final String compassDurabilityComment = "The number of successful structure searches before the compass breaks and must be repaired. Set to 0 to disable durability.";
 			private final int compassDurability;
 
-			private final String defaultXpLevelComment = "The default number of XP levels consumed when searching for a structure. Individual structures can be configured via perStructureXpLevels. Max of 3 levels.";
-			private final int defaultXpLevel;
+			private final String defaultXpCostComment = "The default number of XP levels consumed once having located a structure.";
+			@SerializedName(value = "defaultXpCost", alternate = {"defaultCpCost", "defaultXpLevel"})
+			private final int defaultXpCost;
 
-			private final String perStructureXpLevelsComment = "A map of per-structure XP level costs that override defaultXpLevel. Structures not listed here use defaultXpLevel. Max of 3 levels. The wildcard character * can be used to match any number of characters, and ? can be used to match one character. Ex: {\"minecraft:buried_treasure\":3, \"minecraft:end*\":2, \"minecraft:*village*\":1}";
-			private final Map<String, Integer> perStructureXpLevels;
+			private final String allowSearchWithoutEnoughXpComment = "Allows searches when the player has fewer XP levels than defaultXpCost. On a successful locate, their XP is depleted to zero.";
+			private final Boolean allowSearchWithoutEnoughXp;
 
 			private final String structureBlacklistComment = "A list of structures that the compass will not display in the GUI and will not be able to search for. The wildcard character * can be used to match any number of characters, and ? can be used to match one character. Ex (ignore backslashes): [\"minecraft:stronghold\", \"minecraft:endcity\", \"minecraft:*village*\"]";
 			private final List<String> structureBlacklist;
@@ -159,20 +160,20 @@ public class ExplorersCompassConfig {
 				maxRadius = 30000;
 				maxSamples = 100000;
 				compassDurability = 0;
-				defaultXpLevel = 0;
-				perStructureXpLevels = new HashMap<String, Integer>();
+				defaultXpCost = 0;
+				allowSearchWithoutEnoughXp = false;
 				structureBlacklist = new ArrayList<String>();
 			}
 
-			private Common(boolean allowTeleport, boolean allowExcludeVisited, boolean displayCoordinates, int maxRadius, int maxSamples, int compassDurability, int defaultXpLevel, Map<String, Integer> perStructureXpLevels, List<String> structureBlacklist) {
+			private Common(boolean allowTeleport, boolean allowExcludeVisited, boolean displayCoordinates, int maxRadius, int maxSamples, int compassDurability, int defaultXpCost, boolean allowSearchWithoutEnoughXp, List<String> structureBlacklist) {
 					this.allowTeleport = allowTeleport;
 					this.allowExcludeVisited = allowExcludeVisited;
 				this.displayCoordinates = displayCoordinates;
 				this.maxRadius = maxRadius;
 				this.maxSamples = maxSamples;
 				this.compassDurability = compassDurability;
-				this.defaultXpLevel = defaultXpLevel;
-				this.perStructureXpLevels = perStructureXpLevels;
+				this.defaultXpCost = defaultXpCost;
+				this.allowSearchWithoutEnoughXp = allowSearchWithoutEnoughXp;
 				this.structureBlacklist = structureBlacklist;
 			}
 		}

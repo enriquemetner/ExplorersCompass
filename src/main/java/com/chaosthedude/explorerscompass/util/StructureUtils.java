@@ -138,28 +138,6 @@ public class StructureUtils {
 		return dimensionsForAllowedStructures;
 	}
 
-	public static int getXpLevelsForStructure(ServerWorld world, Identifier structureKey) {
-		int xpLevels = ExplorersCompassConfig.defaultXpLevel;
-		for (String structureRegex : ExplorersCompassConfig.perStructureXpLevels.keySet()) {
-			if (structureKey.toString().matches(convertToRegex(structureRegex))) {
-				xpLevels = ExplorersCompassConfig.perStructureXpLevels.get(structureRegex);
-				if (xpLevels > 3) {
-					xpLevels = 3;
-				}
-				break;
-			}
-		}
-		return xpLevels;
-	}
-
-	public static Map<Identifier, Integer> getXpLevelsForAllowedStructures(ServerWorld world, List<Identifier> allowedStructures) {
-		final Map<Identifier, Integer> xpLevels = new HashMap<Identifier, Integer>();
-		for (Identifier structureKey : allowedStructures) {
-			xpLevels.put(structureKey, getXpLevelsForStructure(world, structureKey));
-		}
-		return xpLevels;
-	}
-
 	public static int getHorizontalDistanceToLocation(PlayerEntity player, int x, int z) {
 		return getHorizontalDistanceToLocation(player.getBlockPos(), x, z);
 	}

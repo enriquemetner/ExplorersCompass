@@ -160,7 +160,7 @@ public class StructureSearchList extends AlwaysSelectedEntryListWidget<Structure
     public void refreshList(Identifier structureIdToSelect) {
 		clearEntries();
 		for (Identifier id : parentScreen.sortStructures()) {
-			StructureSearchEntry entry = new StructureSearchEntry(this, id, player);
+			StructureSearchEntry entry = new StructureSearchEntry(this, id);
 			addEntry(entry);
 			if (id.equals(structureIdToSelect)) {
 				setSelected(entry);

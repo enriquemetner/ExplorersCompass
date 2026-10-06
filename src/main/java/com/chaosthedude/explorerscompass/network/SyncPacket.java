@@ -20,11 +20,13 @@ public class SyncPacket extends PacketByteBuf {
 
 	public static final Identifier ID = new Identifier(ExplorersCompass.MODID, "sync");
 
-	public SyncPacket(boolean canTeleport, boolean canExcludeVisited, boolean infiniteXp, List<Identifier> allowedStructureIDs, Map<Identifier, Integer> xpLevelsForAllowedStructures, ListMultimap<Identifier, Identifier> allowedStructureIDsToDimensionIDs, Map<Identifier, Identifier> structureIDsToGroupIDs) {
+	public SyncPacket(boolean canTeleport, boolean canExcludeVisited, boolean infiniteXp, int defaultXpCost, boolean allowSearchWithoutEnoughXp, List<Identifier> allowedStructureIDs, ListMultimap<Identifier, Identifier> allowedStructureIDsToDimensionIDs, Map<Identifier, Identifier> structureIDsToGroupIDs) {
 		super(Unpooled.buffer());
 		writeBoolean(canTeleport);
 		writeBoolean(canExcludeVisited);
 		writeBoolean(infiniteXp);
+		writeInt(defaultXpCost);
+		writeBoolean(allowSearchWithoutEnoughXp);
 		writeInt(allowedStructureIDs.size());
 		for (Identifier structureID : allowedStructureIDs) {
 			writeIdentifier(structureID);
@@ -35,8 +37,6 @@ public class SyncPacket extends PacketByteBuf {
 			}
 			Identifier groupID = structureIDsToGroupIDs.get(structureID);
 			writeIdentifier(groupID);
-			int xpLevels = xpLevelsForAllowedStructures.getOrDefault(structureID, 0);
-			writeInt(xpLevels);
 		}
 	}
 
@@ -44,8 +44,9 @@ public class SyncPacket extends PacketByteBuf {
 		final boolean canTeleport = buf.readBoolean();
 		final boolean canExcludeVisited = buf.readBoolean();
 		final boolean infiniteXp = buf.readBoolean();
+		final int defaultXpCost = buf.readInt();
+		final boolean allowSearchWithoutEnoughXp = buf.readBoolean();
 		final List<Identifier> allowedStructureIDs = new ArrayList<Identifier>();
-		final Map<Identifier, Integer> xpLevelsForAllowedStructures = new HashMap<Identifier, Integer>();
 		final ListMultimap<Identifier, Identifier> allowedStructureIDsToDimensionIDs = ArrayListMultimap.create();
 		final Map<Identifier, Identifier> structureIDsToGroupIDs = new HashMap<Identifier, Identifier>();
 
@@ -58,13 +59,11 @@ public class SyncPacket extends PacketByteBuf {
 				dimensionIDs.add(buf.readIdentifier());
 			}
 			Identifier groupID = buf.readIdentifier();
-			int xpLevels = buf.readInt();
 
 			if (structureID != null) {
 				allowedStructureIDs.add(structureID);
 				allowedStructureIDsToDimensionIDs.putAll(structureID, dimensionIDs);
 				structureIDsToGroupIDs.put(structureID, groupID);
-				xpLevelsForAllowedStructures.put(structureID, xpLevels);
 			}
 		}
 
@@ -74,7 +73,8 @@ public class SyncPacket extends PacketByteBuf {
 			ExplorersCompass.canExcludeVisited = canExcludeVisited;
 			ExplorersCompass.infiniteXp = infiniteXp;
 			ExplorersCompass.allowedStructureIDs = allowedStructureIDs;
-			ExplorersCompass.xpLevelsForAllowedStructures = xpLevelsForAllowedStructures;
+			ExplorersCompass.defaultXpCost = defaultXpCost;
+			ExplorersCompass.allowSearchWithoutEnoughXp = allowSearchWithoutEnoughXp;
 			ExplorersCompass.allowedStructureIDsToDimensionIDs = allowedStructureIDsToDimensionIDs;
 			ExplorersCompass.structureIDsToGroupIDs = structureIDsToGroupIDs;
 		});

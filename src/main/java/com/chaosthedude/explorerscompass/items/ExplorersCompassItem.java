@@ -110,6 +110,15 @@ public class ExplorersCompassItem extends Item {
         return searchable;
     }
 
+	private boolean rejectIfInsufficientXp(PlayerEntity player, int requestId) {
+		int cost = ExplorersCompassConfig.defaultXpCost;
+		if (!ExplorersCompassConfig.allowSearchWithoutEnoughXp && !player.getAbilities().creativeMode && cost > player.experienceLevel) {
+			SearchResultPacket.send((ServerPlayerEntity) player, requestId, SearchResultPacket.INSUFFICIENT_XP, cost);
+			return true;
+		}
+		return false;
+	}
+
 	public ExplorersCompassItem() {
 		super(new FabricItemSettings().maxCount(1));
 	}
@@ -130,10 +139,9 @@ public class ExplorersCompassItem extends Item {
 				final boolean canTeleport = ExplorersCompassConfig.allowTeleport && PlayerUtils.canTeleport(player);
 				final boolean hasInfiniteXp = player.getAbilities().creativeMode;
 				final List<Identifier> allowedStructures = StructureUtils.getAllowedStructureIDs(serverWorld);
-				final Map<Identifier, Integer> xpLevels = StructureUtils.getXpLevelsForAllowedStructures(serverWorld, allowedStructures);
 				final ListMultimap<Identifier, Identifier> dimensionsForAllowedStructures = StructureUtils.getGeneratingDimensionIDsForAllowedStructures(serverWorld, allowedStructures);
 				final Map<Identifier, Identifier> structureIDsToGroupIDs = StructureUtils.getStructureIDsToGroupIDs(serverWorld);
-				ServerPlayNetworking.send(serverPlayer, SyncPacket.ID, new SyncPacket(canTeleport, ExplorersCompassConfig.allowExcludeVisited, hasInfiniteXp, allowedStructures, xpLevels, dimensionsForAllowedStructures, structureIDsToGroupIDs));
+				ServerPlayNetworking.send(serverPlayer, SyncPacket.ID, new SyncPacket(canTeleport, ExplorersCompassConfig.allowExcludeVisited, hasInfiniteXp, ExplorersCompassConfig.defaultXpCost, ExplorersCompassConfig.allowSearchWithoutEnoughXp, allowedStructures, dimensionsForAllowedStructures, structureIDsToGroupIDs));
 			}
 		} else {
 			cancelSearch(player, -1);
@@ -185,10 +193,11 @@ public class ExplorersCompassItem extends Item {
 
 			List<Structure> structures = new ArrayList<Structure>();
             structureIds = searchableInDimension(world, structureIds);
-			if (structureIds.isEmpty()) {
+            if (structureIds.isEmpty()) {
 				rejectWrongDimension(player, stack, requestId);
                 return;
             }
+			if (rejectIfInsufficientXp(player, requestId)) return;
             SearchSession session = beginSearch(player, stack, requestId);
             setSearching(stack, structureOrGroupId);
             for (Identifier id : structureIds) {
@@ -200,10 +209,6 @@ public class ExplorersCompassItem extends Item {
 				fail(player, stack, structureOrGroupId, 0, 0);
 			}
 
-			int xpLevels = StructureUtils.getXpLevelsForStructure(world, structureOrGroupId);
-			if (!player.getAbilities().creativeMode && xpLevels > 0) {
-				player.addExperienceLevels(-xpLevels);
-			}
 		} else {
             SearchResultPacket.send((ServerPlayerEntity) player, requestId, SearchResultPacket.REJECTED, 0);
         }
@@ -225,6 +230,7 @@ public class ExplorersCompassItem extends Item {
             rejectWrongDimension(player, stack, requestId);
             return;
         }
+		if (rejectIfInsufficientXp(player, requestId)) return;
         List<Structure> structures = new ArrayList<>();
         for (Identifier id : searchable) structures.add(StructureUtils.getStructureForID(world, id));
         SearchSession session = beginSearch(player, stack, requestId);
@@ -235,6 +241,15 @@ public class ExplorersCompassItem extends Item {
     }
 
 	public void succeed(PlayerEntity player, ItemStack stack, Identifier structureID, int x, int z, int samples, boolean displayCoordinates) {
+		SearchSession session = searches.get(player.getUuid());
+		if (session == null || session.stack != stack || structureID == null) return;
+		int xpLevels = ExplorersCompassConfig.defaultXpCost;
+		if (!ExplorersCompassConfig.allowSearchWithoutEnoughXp && !player.getAbilities().creativeMode && xpLevels > player.experienceLevel) {
+			cancelSearch(player, session.requestId);
+			SearchResultPacket.send((ServerPlayerEntity) player, session.requestId, SearchResultPacket.INSUFFICIENT_XP, xpLevels);
+			return;
+		}
+		if (!player.getAbilities().creativeMode && xpLevels > 0) player.addExperienceLevels(-xpLevels);
 		clearSearchData(stack);
 		if (ItemUtils.verifyNBT(stack)) {
 			stack.getNbt().putString("StructureID", structureID.toString());

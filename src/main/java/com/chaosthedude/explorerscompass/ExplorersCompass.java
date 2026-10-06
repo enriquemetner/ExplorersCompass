@@ -43,7 +43,8 @@ public class ExplorersCompass implements ModInitializer {
 	public static boolean canExcludeVisited;
 	public static boolean infiniteXp;
 	public static List<Identifier> allowedStructureIDs;
-	public static Map<Identifier, Integer> xpLevelsForAllowedStructures;
+	public static int defaultXpCost;
+	public static boolean allowSearchWithoutEnoughXp;
 	public static ListMultimap<Identifier, Identifier> allowedStructureIDsToDimensionIDs;
 	public static Map<Identifier, Identifier> structureIDsToGroupIDs;
 
@@ -71,7 +72,6 @@ public class ExplorersCompass implements ModInitializer {
 		ServerPlayNetworking.registerGlobalReceiver(TeleportPacket.ID, TeleportPacket::apply);
 
 		allowedStructureIDs = new ArrayList<Identifier>();
-		xpLevelsForAllowedStructures = new HashMap<Identifier, Integer>();
 		allowedStructureIDsToDimensionIDs = ArrayListMultimap.create();
 		structureIDsToGroupIDs = new HashMap<Identifier, Identifier>();
 	}

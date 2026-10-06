@@ -73,6 +73,7 @@ public class ExplorersCompassScreen extends Screen {
         "string.explorerscompass.closeOnFound",
 		"string.explorerscompass.displayWithChatOpen",
 		"string.explorerscompass.translateStructureNames",
+		"string.explorerscompass.pauseGameWhenOpen",
         "string.explorerscompass.hiddenStructures"
 	};
 
@@ -93,6 +94,7 @@ public class ExplorersCompassScreen extends Screen {
 	private ButtonWidget overlaySideButton;
 	private ButtonWidget clearOnCloseButton;
 	private ButtonWidget clearSearchBarOnCloseButton;
+	private ButtonWidget pauseGameWhenOpenButton;
 	private ButtonWidget closeOnFoundButton;
 	private ButtonWidget checkedFiltersFirstButton;
 	private ButtonWidget adjustRowsToFitViewButton;
@@ -112,8 +114,9 @@ public class ExplorersCompassScreen extends Screen {
     private boolean hiddenStructuresOpen;
     private int hiddenScroll;
     private ButtonWidget hiddenStructuresButton;
-    private enum Dialog { NONE, WRONG_DIMENSION, SEARCHING, FOUND, NOT_FOUND, REJECTED }
+    private enum Dialog { NONE, WRONG_DIMENSION, INSUFFICIENT_XP, SEARCHING, FOUND, NOT_FOUND, REJECTED }
     private Dialog dialog = Dialog.NONE;
+    private int insufficientXpCost;
     private long dialogStarted;
     private long notFoundCompassUpdated;
     private double notFoundCompassAngle;
@@ -240,7 +243,7 @@ public class ExplorersCompassScreen extends Screen {
 
 	@Override
 	public void tick() {
-        if (dialog == Dialog.WRONG_DIMENSION && System.currentTimeMillis() - dialogStarted >= 3000) dialog = Dialog.NONE;
+        if ((dialog == Dialog.WRONG_DIMENSION || dialog == Dialog.INSUFFICIENT_XP) && System.currentTimeMillis() - dialogStarted >= 3000) dialog = Dialog.NONE;
 		searchTextField.tick();
 		filterSearchTextField.tick();
 
@@ -747,6 +750,7 @@ public class ExplorersCompassScreen extends Screen {
 		translateNamesButton.setMessage(Text.translatable(ExplorersCompassConfig.translateStructureNames ? "options.on" : "options.off"));
 		clearOnCloseButton.setMessage(Text.translatable(ExplorersCompassConfig.clearFiltersOnClose ? "options.on" : "options.off"));
 		clearSearchBarOnCloseButton.setMessage(Text.translatable(ExplorersCompassConfig.clearSearchBarOnClose ? "options.on" : "options.off"));
+		pauseGameWhenOpenButton.setMessage(Text.translatable(ExplorersCompassConfig.pauseGameWhenOpen ? "options.on" : "options.off"));
 		checkedFiltersFirstButton.setMessage(Text.translatable(ExplorersCompassConfig.checkedFiltersFirst ? "options.on" : "options.off"));
 		closeOnFoundButton.setMessage(Text.translatable(ExplorersCompassConfig.closeOnFound ? "options.on" : "options.off"));
 		adjustRowsToFitViewButton.setMessage(Text.translatable(ExplorersCompassConfig.adjustRowsToFitView ? "options.on" : "options.off"));
@@ -854,7 +858,7 @@ public class ExplorersCompassScreen extends Screen {
 	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (dialog != Dialog.NONE) {
-            if (dialog == Dialog.WRONG_DIMENSION) { dismissDialog(); return true; }
+            if (dialog == Dialog.WRONG_DIMENSION || dialog == Dialog.INSUFFICIENT_XP) { dismissDialog(); return true; }
             if (button == 0) {
                 int x = dialogX(), y = dialogY(), w = dialogWidth();
                 if ((dialog == Dialog.FOUND || dialog == Dialog.NOT_FOUND)
@@ -1119,6 +1123,10 @@ public class ExplorersCompassScreen extends Screen {
             showWrongDimension(true);
             return false;
         }
+        if (!canAffordSearch()) {
+            showInsufficientXp(ExplorersCompass.defaultXpCost);
+            return false;
+        }
         searchedId = id;
         searchedGroup = group;
         searchedListed = false;
@@ -1140,6 +1148,10 @@ public class ExplorersCompassScreen extends Screen {
         for (Identifier id : selected) if (validDimension(id, false)) eligible.add(id);
         if (eligible.isEmpty()) {
             showWrongDimension(true);
+            return;
+        }
+        if (!canAffordSearch()) {
+            showInsufficientXp(ExplorersCompass.defaultXpCost);
             return;
         }
         searchedListed = true;
@@ -1176,9 +1188,22 @@ public class ExplorersCompassScreen extends Screen {
             dialog = Dialog.NOT_FOUND;
         } else if (result == SearchResultPacket.WRONG_DIMENSION) {
             showWrongDimension(false);
+        } else if (result == SearchResultPacket.INSUFFICIENT_XP) {
+            showInsufficientXp(radius);
         } else {
             dialog = Dialog.REJECTED;
         }
+    }
+
+    private boolean canAffordSearch() {
+        return ExplorersCompass.infiniteXp || ExplorersCompass.allowSearchWithoutEnoughXp
+                || client.player == null || client.player.experienceLevel >= ExplorersCompass.defaultXpCost;
+    }
+
+    private void showInsufficientXp(int cost) {
+        insufficientXpCost = cost;
+        dialog = Dialog.INSUFFICIENT_XP;
+        dialogStarted = System.currentTimeMillis();
     }
 
     private void showWrongDimension(boolean notifyServer) {
@@ -1226,6 +1251,9 @@ public class ExplorersCompassScreen extends Screen {
         if (dialog == Dialog.WRONG_DIMENSION) {
             return Math.min(width - 20, textRenderer.getWidth(Text.translatable("string.explorerscompass.wrongDimension")) + 12);
         }
+        if (dialog == Dialog.INSUFFICIENT_XP) {
+            return Math.min(width - 20, Math.max(textRenderer.getWidth(Text.translatable("string.explorerscompass.insufficientXp")), xpCostLineWidth()) + 12);
+        }
         if (dialog == Dialog.FOUND) {
             int leftWidth = 0;
             for (Text line : foundInfoLines()) leftWidth = Math.max(leftWidth, textRenderer.getWidth(line));
@@ -1245,9 +1273,14 @@ public class ExplorersCompassScreen extends Screen {
     private int notFoundHideY() { return searchedListed ? (listedSkippedCount > 0 ? 78 : 66) : 52; }
     private int notFoundBackY() { return notFoundHideY() + 23; }
     private Text wrongDimensionCountText() { return Text.translatable(listedSkippedCount == 1 ? "string.explorerscompass.wrongDimensionCountOne" : "string.explorerscompass.wrongDimensionCount", listedSkippedCount); }
-    private int dialogHeight() { return dialog == Dialog.WRONG_DIMENSION ? textRenderer.fontHeight + 12 : dialog == Dialog.SEARCHING ? searchingBackY() + 25 : dialog == Dialog.FOUND ? (ExplorersCompass.canTeleport ? 142 : 119) : dialog == Dialog.NOT_FOUND ? notFoundBackY() + 25 : 80; }
+    private int dialogHeight() { return dialog == Dialog.WRONG_DIMENSION ? textRenderer.fontHeight + 12 : dialog == Dialog.INSUFFICIENT_XP ? textRenderer.fontHeight * 2 + 16 : dialog == Dialog.SEARCHING ? searchingBackY() + 25 : dialog == Dialog.FOUND ? (ExplorersCompass.canTeleport ? 142 : 119) : dialog == Dialog.NOT_FOUND ? notFoundBackY() + 25 : 80; }
     private int dialogX() { return (width - dialogWidth()) / 2; }
     private int dialogY() { return (height - dialogHeight()) / 2; }
+
+    private int xpCostLineWidth() {
+        return textRenderer.getWidth(Text.translatable("string.explorerscompass.xpCost")) + 3
+                + 5 + 3 + textRenderer.getWidth(Integer.toString(insufficientXpCost));
+    }
 
     private Text[] foundInfoLines() {
         Identifier groupId = foundStructureId == null ? null : ExplorersCompass.structureIDsToGroupIDs.get(foundStructureId);
@@ -1359,6 +1392,18 @@ public class ExplorersCompassScreen extends Screen {
                 drawDialogButton(context, Text.translatable("string.explorerscompass.teleport").getString(), x + (w - 100) / 2, y + 94, 100, mouseX, mouseY);
             }
             drawDialogButton(context, Text.translatable("string.explorerscompass.back").getString(), x + (w - 70) / 2, y + (ExplorersCompass.canTeleport ? 117 : 94), 70, mouseX, mouseY);
+        } else if (dialog == Dialog.INSUFFICIENT_XP) {
+            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("string.explorerscompass.insufficientXp"), x + w / 2, y + 6, 0xffff4444);
+            int lineX = x + (w - xpCostLineWidth()) / 2;
+            int lineY = y + 10 + textRenderer.fontHeight;
+            Text costLabel = Text.translatable("string.explorerscompass.xpCost");
+            context.drawTextWithShadow(textRenderer, costLabel, lineX, lineY, 0xffffff);
+            int orbX = lineX + textRenderer.getWidth(costLabel) + 3;
+            int orbSize = 5;
+            int orbFrame = (int)((System.currentTimeMillis() / 40L) % 20L);
+            Identifier orbTexture = new Identifier(ExplorersCompass.MODID, String.format(Locale.ROOT, "textures/gui/experience_orb_%02d.png", orbFrame));
+            context.drawTexture(orbTexture, orbX, lineY + (textRenderer.fontHeight - orbSize) / 2, orbSize, orbSize, 0, 0, 16, 16, 16, 16);
+            context.drawTextWithShadow(textRenderer, Integer.toString(insufficientXpCost), orbX + orbSize + 3, lineY, 0x80ff20);
         } else {
             Text message = dialog == Dialog.WRONG_DIMENSION ? Text.translatable("string.explorerscompass.wrongDimension")
                 : dialog == Dialog.NOT_FOUND ? Text.translatable("string.explorerscompass.notFoundWithin", failedRadius)
@@ -1548,8 +1593,13 @@ public class ExplorersCompassScreen extends Screen {
 			ExplorersCompassConfig.save();
 			updateSettingsButtonLabels();
 		}));
+		pauseGameWhenOpenButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(9), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), button -> {
+			ExplorersCompassConfig.pauseGameWhenOpen = !ExplorersCompassConfig.pauseGameWhenOpen;
+			ExplorersCompassConfig.save();
+			updateSettingsButtonLabels();
+		}));
 		updateSettingsButtonLabels();
-        hiddenStructuresButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(9), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.translatable("string.explorerscompass.open"), button -> {
+        hiddenStructuresButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(10), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.translatable("string.explorerscompass.open"), button -> {
             settingsOpen = false;
             hiddenStructuresOpen = true;
             hiddenScroll = 0;
@@ -1613,7 +1663,7 @@ public class ExplorersCompassScreen extends Screen {
 		cancelButton.setX(width - 30);
 		settingsButton.setY(height - 30);
         hiddenStructuresButton.setX(settingsControlX());
-        hiddenStructuresButton.setY(settingsRowY(9));
+        hiddenStructuresButton.setY(settingsRowY(10));
 		if (width >= 480) {
 			teleportButton.setX(cancelButton.getX() - teleportButton.getWidth() - 5);
 			teleportButton.setY(10);
@@ -1658,7 +1708,8 @@ public class ExplorersCompassScreen extends Screen {
 		placeSetting(closeOnFoundButton, 6);
 		placeSetting(chatOverlayButton, 7);
 		placeSetting(translateNamesButton, 8);
-		placeSetting(hiddenStructuresButton, 9);
+		placeSetting(pauseGameWhenOpenButton, 9);
+		placeSetting(hiddenStructuresButton, 10);
 	}
 
 	private void placeSetting(ButtonWidget button, int row) {

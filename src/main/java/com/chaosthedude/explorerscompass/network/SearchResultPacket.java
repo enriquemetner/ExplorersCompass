@@ -13,7 +13,7 @@ import net.minecraft.util.Identifier;
 
 public class SearchResultPacket extends PacketByteBuf {
     public static final Identifier ID = new Identifier(ExplorersCompass.MODID, "search_result");
-    public static final int FOUND = 0, NOT_FOUND = 1, REJECTED = 2, WRONG_DIMENSION = 3;
+    public static final int FOUND = 0, NOT_FOUND = 1, REJECTED = 2, WRONG_DIMENSION = 3, INSUFFICIENT_XP = 4;
 
     public SearchResultPacket(int requestId, int result, int radius, Identifier foundId, int foundX, int foundZ, boolean displayCoordinates) {
         super(Unpooled.buffer());
