@@ -73,8 +73,9 @@ public class ExplorersCompassScreen extends Screen {
 		"string.explorerscompass.clearFiltersOnClose",
 		"string.explorerscompass.checkedFiltersFirst",
 		"string.explorerscompass.adjustRowsToFitView",
-        "string.explorerscompass.closeOnFound",
+		"string.explorerscompass.closeOnFound",
 		"string.explorerscompass.displayWithChatOpen",
+		"string.explorerscompass.showTechnicalNames",
 		"string.explorerscompass.translateStructureNames",
 		"string.explorerscompass.pauseGameWhenOpen",
         "string.explorerscompass.hiddenStructures"
@@ -93,6 +94,7 @@ public class ExplorersCompassScreen extends Screen {
 	private ButtonWidget filtersButton;
 	private ButtonWidget settingsButton;
 	private ButtonWidget chatOverlayButton;
+	private ButtonWidget showTechnicalNamesButton;
 	private ButtonWidget translateNamesButton;
 	private ButtonWidget overlaySideButton;
 	private ButtonWidget clearOnCloseButton;
@@ -750,6 +752,7 @@ public class ExplorersCompassScreen extends Screen {
 
 	private void updateSettingsButtonLabels() {
 		chatOverlayButton.setMessage(Text.translatable(ExplorersCompassConfig.displayWithChatOpen ? "options.on" : "options.off"));
+		showTechnicalNamesButton.setMessage(Text.translatable(ExplorersCompassConfig.showTechnicalNames ? "options.on" : "options.off"));
 		translateNamesButton.setMessage(Text.translatable(ExplorersCompassConfig.translateStructureNames ? "options.on" : "options.off"));
 		clearOnCloseButton.setMessage(Text.translatable(ExplorersCompassConfig.clearFiltersOnClose ? "options.on" : "options.off"));
 		clearSearchBarOnCloseButton.setMessage(Text.translatable(ExplorersCompassConfig.clearSearchBarOnClose ? "options.on" : "options.off"));
@@ -1524,7 +1527,8 @@ public class ExplorersCompassScreen extends Screen {
 				if (StructureUtils.getStructureSource(id).toLowerCase(Locale.ROOT).contains(searchTerm.substring(1))) {
 					structureIDsMatchingSearch.add(id);
 				}
-			} else if (StructureUtils.getStructureName(id).toLowerCase(Locale.ROOT).contains(searchTerm)) {
+			} else if (StructureUtils.getStructureName(id).toLowerCase(Locale.ROOT).contains(searchTerm)
+					|| (ExplorersCompassConfig.showTechnicalNames && id.toString().toLowerCase(Locale.ROOT).contains(searchTerm))) {
 				structureIDsMatchingSearch.add(id);
 			}
 		}
@@ -1618,7 +1622,13 @@ public class ExplorersCompassScreen extends Screen {
 			updateSettingsButtonLabels();
 			filterScroll = MathHelper.clamp(filterScroll, 0, filterMaxScroll());
 		}));
-		translateNamesButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(8), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), (onPress) -> {
+		showTechnicalNamesButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(8), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), button -> {
+			ExplorersCompassConfig.showTechnicalNames = !ExplorersCompassConfig.showTechnicalNames;
+			ExplorersCompassConfig.save();
+			updateSettingsButtonLabels();
+			processSearchTerm();
+		}));
+		translateNamesButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(9), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), (onPress) -> {
 			ExplorersCompassConfig.translateStructureNames = !ExplorersCompassConfig.translateStructureNames;
 			ExplorersCompassConfig.save();
 			updateSettingsButtonLabels();
@@ -1639,13 +1649,13 @@ public class ExplorersCompassScreen extends Screen {
 			ExplorersCompassConfig.save();
 			updateSettingsButtonLabels();
 		}));
-		pauseGameWhenOpenButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(9), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), button -> {
+		pauseGameWhenOpenButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(10), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), button -> {
 			ExplorersCompassConfig.pauseGameWhenOpen = !ExplorersCompassConfig.pauseGameWhenOpen;
 			ExplorersCompassConfig.save();
 			updateSettingsButtonLabels();
 		}));
 		updateSettingsButtonLabels();
-        hiddenStructuresButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(10), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.translatable("string.explorerscompass.open"), button -> {
+        hiddenStructuresButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(11), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.translatable("string.explorerscompass.open"), button -> {
             settingsOpen = false;
             hiddenStructuresOpen = true;
             hiddenScroll = 0;
@@ -1732,7 +1742,7 @@ public class ExplorersCompassScreen extends Screen {
 		cancelButton.setX(width - 30);
 		settingsButton.setY(height - 30);
         hiddenStructuresButton.setX(settingsControlX());
-        hiddenStructuresButton.setY(settingsRowY(10));
+        hiddenStructuresButton.setY(settingsRowY(11));
 		if (width >= 480) {
 			teleportButton.setX(cancelButton.getX() - teleportButton.getWidth() - 5);
 			teleportButton.setY(10);
@@ -1755,6 +1765,7 @@ public class ExplorersCompassScreen extends Screen {
         hiddenStructuresButton.visible = settingsOpen;
 		closeOnFoundButton.visible = settingsOpen;
 		chatOverlayButton.visible = settingsOpen;
+		showTechnicalNamesButton.visible = settingsOpen;
 		translateNamesButton.visible = settingsOpen;
 		offsetDecreaseButton.visible = settingsOpen;
 		offsetIncreaseButton.visible = settingsOpen;
@@ -1777,9 +1788,10 @@ public class ExplorersCompassScreen extends Screen {
 		placeSetting(adjustRowsToFitViewButton, 5);
 		placeSetting(closeOnFoundButton, 6);
 		placeSetting(chatOverlayButton, 7);
-		placeSetting(translateNamesButton, 8);
-		placeSetting(pauseGameWhenOpenButton, 9);
-		placeSetting(hiddenStructuresButton, 10);
+		placeSetting(showTechnicalNamesButton, 8);
+		placeSetting(translateNamesButton, 9);
+		placeSetting(pauseGameWhenOpenButton, 10);
+		placeSetting(hiddenStructuresButton, 11);
 	}
 
 	private void placeSetting(ButtonWidget button, int row) {

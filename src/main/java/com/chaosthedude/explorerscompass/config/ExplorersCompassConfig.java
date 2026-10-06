@@ -41,6 +41,7 @@ public class ExplorersCompassConfig {
 	public static boolean closeOnFound = true;
 	public static boolean checkedFiltersFirst = true;
 	public static boolean adjustRowsToFitView = true;
+	public static boolean showTechnicalNames = false;
 	public static boolean translateStructureNames = true;
 	public static int overlayLineOffset = 0;
 	public static OverlaySide overlaySide = OverlaySide.LEFT;
@@ -81,6 +82,7 @@ public class ExplorersCompassConfig {
 				closeOnFound = data.client.closeOnFound == null || data.client.closeOnFound;
 				checkedFiltersFirst = data.client.checkedFiltersFirst;
 				adjustRowsToFitView = data.client.adjustRowsToFitView == null || data.client.adjustRowsToFitView;
+				showTechnicalNames = data.client.showTechnicalNames != null && data.client.showTechnicalNames;
 				translateStructureNames = data.client.translateStructureNames;
 				overlayLineOffset = data.client.overlayLineOffset;
 				overlaySide = data.client.overlaySide;
@@ -98,7 +100,7 @@ public class ExplorersCompassConfig {
 	public static void save() {
 		try {
 			Writer writer = Files.newBufferedWriter(getFilePath());
-			Data data = new Data(new Data.Common(allowTeleport, allowExcludeVisited, displayCoordinates, maxSamples, compassDurability, defaultXpCost, allowSearchWithoutEnoughXp, structureBlacklist), new Data.Client(displayWithChatOpen, pauseGameWhenOpen, clearFiltersOnClose, clearSearchBarOnClose, closeOnFound, checkedFiltersFirst, adjustRowsToFitView, translateStructureNames, overlayLineOffset, overlaySide, sortOrder, hiddenStructures));
+			Data data = new Data(new Data.Common(allowTeleport, allowExcludeVisited, displayCoordinates, maxSamples, compassDurability, defaultXpCost, allowSearchWithoutEnoughXp, structureBlacklist), new Data.Client(displayWithChatOpen, pauseGameWhenOpen, clearFiltersOnClose, clearSearchBarOnClose, closeOnFound, checkedFiltersFirst, adjustRowsToFitView, showTechnicalNames, translateStructureNames, overlayLineOffset, overlaySide, sortOrder, hiddenStructures));
 			gson.toJson(data, writer);
 			writer.close();
 		} catch (IOException e) {
@@ -185,6 +187,8 @@ public class ExplorersCompassConfig {
 			private final boolean checkedFiltersFirst;
 			private final String adjustRowsToFitViewComment = "Adjusts row spacing, showing less content but only fully visible list entries. Smooth scrolling may still show partial entries.";
 			private final Boolean adjustRowsToFitView;
+			private final String showTechnicalNamesComment = "Shows each structure's technical ID next to its readable name and allows searching by ID.";
+			private final Boolean showTechnicalNames;
 
 			private final String translateStructureNamesComment = "Attempts to translate structure names before fixing the unlocalized names. Translations may not be available for all structures.";
 			private final boolean translateStructureNames;
@@ -205,6 +209,7 @@ public class ExplorersCompassConfig {
 				closeOnFound = true;
 				checkedFiltersFirst = true;
 				adjustRowsToFitView = true;
+				showTechnicalNames = false;
 				translateStructureNames = true;
 				overlayLineOffset = 0;
 				overlaySide = OverlaySide.LEFT;
@@ -212,7 +217,7 @@ public class ExplorersCompassConfig {
 			hiddenStructures = new ArrayList<String>();
 			}
 
-			private Client(boolean displayWithChatOpen, boolean pauseGameWhenOpen, boolean clearFiltersOnClose, boolean clearSearchBarOnClose, boolean closeOnFound, boolean checkedFiltersFirst, boolean adjustRowsToFitView, boolean translateStructureNames, int overlayLineOffset, OverlaySide overlaySide, List<String> sortOrder, List<String> hiddenStructures) {
+			private Client(boolean displayWithChatOpen, boolean pauseGameWhenOpen, boolean clearFiltersOnClose, boolean clearSearchBarOnClose, boolean closeOnFound, boolean checkedFiltersFirst, boolean adjustRowsToFitView, boolean showTechnicalNames, boolean translateStructureNames, int overlayLineOffset, OverlaySide overlaySide, List<String> sortOrder, List<String> hiddenStructures) {
 				this.displayWithChatOpen = displayWithChatOpen;
 				this.pauseGameWhenOpen = pauseGameWhenOpen;
 				this.clearFiltersOnClose = clearFiltersOnClose;
@@ -220,6 +225,7 @@ public class ExplorersCompassConfig {
 				this.closeOnFound = closeOnFound;
 				this.checkedFiltersFirst = checkedFiltersFirst;
 				this.adjustRowsToFitView = adjustRowsToFitView;
+				this.showTechnicalNames = showTechnicalNames;
 				this.translateStructureNames = translateStructureNames;
 				this.overlayLineOffset = overlayLineOffset;
 				this.overlaySide = overlaySide;

@@ -1,6 +1,7 @@
 package com.chaosthedude.explorerscompass.gui;
 
 import com.chaosthedude.explorerscompass.ExplorersCompass;
+import com.chaosthedude.explorerscompass.config.ExplorersCompassConfig;
 import com.chaosthedude.explorerscompass.util.StructureUtils;
 import com.mojang.blaze3d.systems.RenderSystem;
 
@@ -39,7 +40,26 @@ public class StructureSearchEntry extends AlwaysSelectedEntryListWidget.Entry<St
         int buttonX = left + width - buttonWidth - 8;
         int buttonY = top + (height - 20) / 2;
         int textWidth = Math.max(1, buttonX - left - 10);
-        context.drawText(client.textRenderer, client.textRenderer.trimToWidth(StructureUtils.getStructureName(structureID), textWidth), left + 5, top + (height / 2) - ((client.textRenderer.fontHeight + 2) * 2), nameColor, true);
+        String readableName = StructureUtils.getStructureName(structureID);
+        int nameY = top + (height / 2) - ((client.textRenderer.fontHeight + 2) * 2);
+        if (ExplorersCompassConfig.showTechnicalNames) {
+            String technicalName = " (" + structureID + ")";
+            int nameWidth = Math.max(textWidth / 2, textWidth - client.textRenderer.getWidth(technicalName));
+            String visibleName = client.textRenderer.trimToWidth(readableName, nameWidth);
+            int remainingWidth = Math.max(0, textWidth - client.textRenderer.getWidth(visibleName));
+            context.drawText(client.textRenderer, visibleName, left + 5, nameY, nameColor, true);
+            int bracketWidth = client.textRenderer.getWidth(" ()");
+            if (remainingWidth >= bracketWidth) {
+                String visibleId = client.textRenderer.trimToWidth(structureID.toString(), remainingWidth - bracketWidth);
+                int technicalX = left + 5 + client.textRenderer.getWidth(visibleName);
+                context.drawText(client.textRenderer, " (", technicalX, nameY, nameColor, true);
+                technicalX += client.textRenderer.getWidth(" (");
+                context.drawText(client.textRenderer, visibleId, technicalX, nameY, infoColor, true);
+                context.drawText(client.textRenderer, ")", technicalX + client.textRenderer.getWidth(visibleId), nameY, nameColor, true);
+            }
+        } else {
+            context.drawText(client.textRenderer, client.textRenderer.trimToWidth(readableName, textWidth), left + 5, nameY, nameColor, true);
+        }
         context.drawText(client.textRenderer, client.textRenderer.trimToWidth(Text.translatable("string.explorerscompass.source").getString() + ": " + StructureUtils.getStructureSource(structureID), textWidth), left + 5, top + (height / 2) - ((client.textRenderer.fontHeight + 2) * 1), infoColor, true);
         context.drawText(client.textRenderer, client.textRenderer.trimToWidth(Text.translatable("string.explorerscompass.group").getString() + ": " + StructureUtils.getStructureName(ExplorersCompass.structureIDsToGroupIDs.get(structureID)), textWidth), left + 5, top + (height / 2) - ((client.textRenderer.fontHeight + 2) * 0), infoColor, true);
         context.drawText(client.textRenderer, client.textRenderer.trimToWidth(Text.translatable("string.explorerscompass.dimension").getString() + ": " + StructureUtils.structureDimensionsToString(ExplorersCompass.allowedStructureIDsToDimensionIDs.get(structureID)), textWidth), left + 5, top + (height / 2) + ((client.textRenderer.fontHeight + 2) * 1), infoColor, true);
