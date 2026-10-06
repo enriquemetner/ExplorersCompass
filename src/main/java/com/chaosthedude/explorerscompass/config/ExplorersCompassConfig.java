@@ -27,7 +27,7 @@ public class ExplorersCompassConfig {
 	public static boolean allowTeleport = true;
 	public static boolean allowExcludeVisited = true;
 	public static boolean displayCoordinates = true;
-	public static int maxRadius = 10000;
+	public static int maxRadius = 30000;
 	public static int maxSamples = 100000;
 	public static int compassDurability = 0;
 	public static int defaultXpLevel = 0;
@@ -40,10 +40,10 @@ public class ExplorersCompassConfig {
 	public static boolean clearFiltersOnClose = true;
 	public static boolean clearSearchBarOnClose = true;
 	public static boolean closeOnFound = true;
-	public static boolean checkedFiltersFirst = false;
+	public static boolean checkedFiltersFirst = true;
 	public static boolean adjustRowsToFitView = true;
 	public static boolean translateStructureNames = true;
-	public static int overlayLineOffset = 1;
+	public static int overlayLineOffset = 0;
 	public static OverlaySide overlaySide = OverlaySide.LEFT;
 	public static List<String> sortOrder = defaultSortOrder();
 
@@ -156,7 +156,7 @@ public class ExplorersCompassConfig {
 					allowTeleport = true;
 					allowExcludeVisited = true;
 				displayCoordinates = true;
-				maxRadius = 10000;
+				maxRadius = 30000;
 				maxSamples = 100000;
 				compassDurability = 0;
 				defaultXpLevel = 0;
@@ -209,10 +209,10 @@ public class ExplorersCompassConfig {
 				clearFiltersOnClose = true;
 				clearSearchBarOnClose = true;
 				closeOnFound = true;
-				checkedFiltersFirst = false;
+				checkedFiltersFirst = true;
 				adjustRowsToFitView = true;
 				translateStructureNames = true;
-				overlayLineOffset = 1;
+				overlayLineOffset = 0;
 				overlaySide = OverlaySide.LEFT;
 				sortOrder = defaultSortOrder();
 			hiddenStructures = new ArrayList<String>();
