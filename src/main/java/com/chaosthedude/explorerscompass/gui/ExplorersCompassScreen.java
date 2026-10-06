@@ -4,6 +4,7 @@ import java.text.Collator;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -58,8 +59,7 @@ public class ExplorersCompassScreen extends Screen {
 	private static final int FILTER_SECTION_GAP = 1;
 	private static final int FILTER_CHECKBOX_SIZE = 9;
 	private static final int BUTTON_CROSS_SIZE = 7;
-	private static final int SCROLLBAR_WIDTH = 6;
-	private static final int FILTER_SCROLLBAR_GRAB_PADDING = 2;
+	private static final int SCROLLBAR_WIDTH = Scrollbar.WIDTH;
 	private static final int SETTINGS_ROW_HEIGHT = 30;
 	private static final int SETTINGS_CONTROL_WIDTH = 90;
 	private static String sessionSearchText = "";
@@ -111,7 +111,10 @@ public class ExplorersCompassScreen extends Screen {
 	private ButtonWidget cancelButton;
 	private TransparentTextField searchTextField;
 	private TransparentTextField filterSearchTextField;
+	private TransparentTextField hiddenSearchTextField;
 	private StructureSearchList selectionList;
+	private final Set<Identifier> pendingHiddenStructures = new HashSet<>();
+	private String hiddenSearchText = "";
 	private boolean filtersOpen;
 	private boolean settingsOpen;
     private boolean hiddenStructuresOpen;
@@ -139,10 +142,9 @@ public class ExplorersCompassScreen extends Screen {
     private boolean showFoundCoordinates;
 	private double filterScroll;
 	private int settingsFirstRow;
-	private boolean draggingSettingsScrollbar;
-	private double settingsScrollbarGrabOffset;
-	private boolean draggingFilterScrollbar;
-	private double filterScrollbarGrabOffset;
+	private enum ScrollPanel { FILTERS, SETTINGS, HIDDEN }
+	private ScrollPanel draggedScrollbar;
+	private double scrollbarGrabOffset;
 	private final List<List<FilterOption>> filterOptions = List.of(new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
 	private boolean showSourceColumn = true;
 	private final List<SortCriterion> sortOrder = new ArrayList<SortCriterion>();
@@ -197,6 +199,8 @@ public class ExplorersCompassScreen extends Screen {
 			FilterSelections.clear();
 		}
 		sessionSearchText = ExplorersCompassConfig.clearSearchBarOnClose ? "" : searchTextField.getText();
+		pendingHiddenStructures.clear();
+		hiddenSearchText = "";
 		super.removed();
 	}
 
@@ -204,23 +208,17 @@ public class ExplorersCompassScreen extends Screen {
 	public boolean mouseScrolled(double scroll1, double scroll2, double scroll3) {
         if (dialog != Dialog.NONE) return true;
         if (hiddenStructuresOpen) {
-            hiddenScroll = MathHelper.clamp(hiddenScroll - (int)Math.signum(scroll3) * 2, 0, Math.max(0, ExplorersCompassConfig.hiddenStructures.size() - hiddenVisibleRows()));
+            hiddenScroll = Scrollbar.scrollRows(hiddenScroll, scroll3, 2, hiddenMaxScroll());
             return true;
         }
 		if (settingsOpen) {
-			settingsFirstRow = MathHelper.clamp(settingsFirstRow - (int)Math.signum(scroll3), 0, settingsMaxFirstRow());
+			settingsFirstRow = Scrollbar.scrollRows(settingsFirstRow, scroll3, 1, settingsMaxFirstRow());
 			updateViewButtons();
 			return true;
 		}
 		if (filtersOpen) {
 			if (scroll1 >= filterLeft() && scroll1 < filterScrollbarRight() && scroll2 >= filterTop() && scroll2 < filterBottom()) {
-				int rowHeight = filterRowHeight();
-				double target = filterScroll - scroll3 * rowHeight;
-				if (scroll3 != 0 && Math.rint(scroll3) == scroll3) {
-					double row = filterScroll / rowHeight - scroll3;
-					target = (scroll3 < 0 ? Math.floor(row) : Math.ceil(row)) * rowHeight;
-				}
-				filterScroll = MathHelper.clamp(target, 0, filterMaxScroll());
+				filterScroll = Scrollbar.scrollPixels(filterScroll, scroll3, filterRowHeight(), filterMaxScroll());
 				return true;
 			}
 			return super.mouseScrolled(scroll1, scroll2, scroll3);
@@ -250,14 +248,15 @@ public class ExplorersCompassScreen extends Screen {
         if ((dialog == Dialog.WRONG_DIMENSION || dialog == Dialog.INSUFFICIENT_XP) && System.currentTimeMillis() - dialogStarted >= 3000) dialog = Dialog.NONE;
 		searchTextField.tick();
 		filterSearchTextField.tick();
+		hiddenSearchTextField.tick();
 
 		boolean hasSelection = selectionList.hasSelection();
 		boolean selectionMatchesFound = hasSelection && foundStructureId != null && selectionList.getSelectedOrNull().getStructureID().equals(foundStructureId);
 
-		searchButton.active = isStructureView() && hasSelection;
+		searchButton.active = isStructureView() && hasSelection && !isStructureHidden(selectionList.getSelectedOrNull().getStructureID());
 		clearFiltersButton.active = !FilterSelections.isEmpty();
 		clearFiltersTopButton.active = !FilterSelections.isEmpty();
-		searchListedButton.active = isStructureView() && !structureIDsMatchingSearch.isEmpty();
+		searchListedButton.active = isStructureView() && structureIDsMatchingSearch.stream().anyMatch(id -> !isStructureHidden(id));
 		teleportButton.active = isStructureView() && selectionMatchesFound;
 		sortOrderButton.active = isStructureView();
 
@@ -320,7 +319,8 @@ public class ExplorersCompassScreen extends Screen {
 			context.drawTextWithShadow(textRenderer, Text.translatable("string.explorerscompass.filters"), 10, 15, 0xffffff);
         } else if (hiddenStructuresOpen) {
             String breadcrumb = Text.translatable("string.explorerscompass.hiddenBreadcrumb").getString();
-            context.drawTextWithShadow(textRenderer, breadcrumb, 10, 15, 0xffffff);
+            context.drawTextWithShadow(textRenderer, textRenderer.trimToWidth(breadcrumb,
+                    Math.max(1, hiddenSearchTextField.getX() - 20)), 10, 15, 0xffffff);
 		} else if (settingsOpen) {
 			context.drawTextWithShadow(textRenderer, Text.translatable("string.explorerscompass.settings"), 10, 15, 0xffffff);
 		} else {
@@ -328,6 +328,9 @@ public class ExplorersCompassScreen extends Screen {
 		}
 		if (settingsOpen) {
 			renderSettingsTooltip(context, mouseX, mouseY);
+		}
+		if (isStructureView() && dialog == Dialog.NONE && !sortMenuOpen && selectionList.isHideButtonHovered(mouseX, mouseY)) {
+			drawQuestionTooltip(context, "string.explorerscompass.hide.tooltip", mouseX, mouseY);
 		}
         if (dialog != Dialog.NONE) renderSearchDialog(context, mouseX, mouseY);
 	}
@@ -553,13 +556,16 @@ public class ExplorersCompassScreen extends Screen {
 		return Math.max(0, maxScroll);
 	}
 
-	private int filterThumbHeight() {
-		int viewport = filterBottom() - filterTop();
-		return MathHelper.clamp(viewport * viewport / (viewport + filterMaxScroll()), 32, viewport - 8);
-	}
-
-	private int filterThumbTop() {
-		return filterTop() + (int) (filterScroll * (filterBottom() - filterTop() - filterThumbHeight()) / filterMaxScroll());
+	private Scrollbar scrollbarFor(ScrollPanel panel) {
+		int trackHeight = filterBottom() - filterTop();
+		return switch (panel) {
+			case FILTERS -> new Scrollbar(filterRight(), filterTop(), filterBottom(),
+					Scrollbar.pixelThumbHeight(trackHeight, filterMaxScroll(), 32, 8), filterScroll, filterMaxScroll());
+			case SETTINGS -> new Scrollbar(filterRight(), filterTop(), filterBottom(),
+					Scrollbar.rowThumbHeight(trackHeight, settingsVisibleRows(), SETTINGS_LABEL_KEYS.length), settingsFirstRow, settingsMaxFirstRow());
+			case HIDDEN -> new Scrollbar(filterRight(), filterTop(), filterBottom(),
+					Scrollbar.rowThumbHeight(trackHeight, hiddenVisibleRows(), filteredHiddenStructures().size()), hiddenScroll, hiddenMaxScroll());
+		};
 	}
 
 	private void rebuildFilterOptions() {
@@ -708,14 +714,7 @@ public class ExplorersCompassScreen extends Screen {
 			context.drawCenteredTextWithShadow(textRenderer, offset, 0, 0, 0xffffff);
 			context.getMatrices().pop();
 		}
-		if (settingsMaxFirstRow() > 0) {
-			int trackX = filterRight();
-			int trackHeight = filterBottom() - filterTop();
-			int thumbHeight = Math.max(12, trackHeight * settingsVisibleRows() / SETTINGS_LABEL_KEYS.length);
-			int thumbY = filterTop() + (trackHeight - thumbHeight) * settingsFirstRow / settingsMaxFirstRow();
-			context.fill(trackX, filterTop(), trackX + SCROLLBAR_WIDTH, filterBottom(), RenderUtils.getBackgroundColor(false, false));
-			RenderUtils.drawScrollbarThumb(context, trackX, thumbY, SCROLLBAR_WIDTH, thumbHeight, RenderUtils.getBackgroundColor(true, true));
-		}
+		scrollbarFor(ScrollPanel.SETTINGS).render(context);
 	}
 
 	private void renderSettingsTooltip(DrawContext context, int mouseX, int mouseY) {
@@ -812,11 +811,7 @@ public class ExplorersCompassScreen extends Screen {
 			}
 			context.disableScissor();
 		}
-		if (filterMaxScroll() > 0) {
-			int thumbTop = filterThumbTop();
-			context.fill(right, filterTop(), filterScrollbarRight(), bottom, RenderUtils.getBackgroundColor(false, false));
-			RenderUtils.drawScrollbarThumb(context, right, thumbTop, SCROLLBAR_WIDTH, filterThumbHeight(), RenderUtils.getBackgroundColor(true, true));
-		}
+		scrollbarFor(ScrollPanel.FILTERS).render(context);
 	}
 
 	private Text filterOptionText(FilterOption option, String label) {
@@ -890,44 +885,24 @@ public class ExplorersCompassScreen extends Screen {
 			}
 		}
         if (hiddenStructuresOpen) {
+            if (button == 0 && beginScrollbarDrag(ScrollPanel.HIDDEN, mouseX, mouseY)) return true;
             if (button == 0 && mouseX >= width - 95 && mouseX < width - 17 && mouseY >= filterTop() + 6) {
                 int row = (int)(mouseY - filterTop() - 6) / 25;
                 int index = hiddenScroll + row;
-                if (row >= 0 && row < hiddenVisibleRows() && index < ExplorersCompassConfig.hiddenStructures.size()) {
-                    ExplorersCompassConfig.hiddenStructures.remove(index);
+                List<String> visible = filteredHiddenStructures();
+                if (row >= 0 && row < hiddenVisibleRows() && index < visible.size()
+                        && mouseY < filterTop() + 6 + row * 25 + 20) {
+                    ExplorersCompassConfig.hiddenStructures.remove(visible.get(index));
                     ExplorersCompassConfig.save();
-                    hiddenScroll = MathHelper.clamp(hiddenScroll, 0, Math.max(0, ExplorersCompassConfig.hiddenStructures.size() - hiddenVisibleRows()));
+                    hiddenScroll = MathHelper.clamp(hiddenScroll, 0, Math.max(0, filteredHiddenStructures().size() - hiddenVisibleRows()));
                     processSearchTerm();
                 }
             }
             return super.mouseClicked(mouseX, mouseY, button);
         }
-		if (settingsOpen && button == 0 && settingsMaxFirstRow() > 0
-				&& mouseX >= filterRight() && mouseX < filterScrollbarRight()
-				&& mouseY >= filterTop() && mouseY < filterBottom()) {
-			int trackHeight = filterBottom() - filterTop();
-			int thumbHeight = Math.max(12, trackHeight * settingsVisibleRows() / SETTINGS_LABEL_KEYS.length);
-			int thumbY = filterTop() + (trackHeight - thumbHeight) * settingsFirstRow / settingsMaxFirstRow();
-			settingsScrollbarGrabOffset = mouseY >= thumbY && mouseY < thumbY + thumbHeight ? mouseY - thumbY : thumbHeight / 2.0;
-			draggingSettingsScrollbar = true;
-			moveSettingsScrollbar(mouseY);
-			return true;
-		}
+		if (settingsOpen && button == 0 && beginScrollbarDrag(ScrollPanel.SETTINGS, mouseX, mouseY)) return true;
 		if (filtersOpen && button == 0) {
-			if (filterMaxScroll() > 0 && mouseX >= filterRight() && mouseX < filterScrollbarRight()
-					&& mouseY >= filterTop() && mouseY < filterBottom()) {
-				int thumbTop = filterThumbTop();
-				int thumbHeight = filterThumbHeight();
-				int thumbBottom = thumbTop + thumbHeight;
-				if (mouseY < thumbTop - FILTER_SCROLLBAR_GRAB_PADDING || mouseY >= thumbBottom + FILTER_SCROLLBAR_GRAB_PADDING) {
-					filterScrollbarGrabOffset = thumbHeight / 2.0;
-					moveFilterScrollbar(mouseY);
-				} else {
-					filterScrollbarGrabOffset = MathHelper.clamp(mouseY - thumbTop, 0, thumbHeight);
-				}
-				draggingFilterScrollbar = true;
-				return true;
-			}
+			if (beginScrollbarDrag(ScrollPanel.FILTERS, mouseX, mouseY)) return true;
 			int column = filterColumnAt(mouseX, mouseY);
 			if (column >= 0 && mouseY >= filterRowsTop()) {
 				List<FilterOption> options = visibleFilterOptions(column);
@@ -956,7 +931,7 @@ public class ExplorersCompassScreen extends Screen {
 	}
 
 	private TransparentTextField searchFieldAt(double mouseX, double mouseY) {
-		for (TransparentTextField field : new TransparentTextField[] {searchTextField, filterSearchTextField}) {
+		for (TransparentTextField field : new TransparentTextField[] {searchTextField, filterSearchTextField, hiddenSearchTextField}) {
 			if (field != null && field.isVisible() && mouseX >= field.getX() && mouseX < field.getX() + field.getWidth()
 					&& mouseY >= field.getY() && mouseY < field.getY() + field.getHeight()) return field;
 		}
@@ -965,12 +940,8 @@ public class ExplorersCompassScreen extends Screen {
 
 	@Override
 	public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
-		if (draggingSettingsScrollbar && button == 0) {
-			moveSettingsScrollbar(mouseY);
-			return true;
-		}
-		if (draggingFilterScrollbar && button == 0) {
-			moveFilterScrollbar(mouseY);
+		if (draggedScrollbar != null && button == 0) {
+			moveScrollbar(mouseY);
 			return true;
 		}
 		if (draggedSortRow >= 0 && button == 0) {
@@ -990,12 +961,8 @@ public class ExplorersCompassScreen extends Screen {
 
 	@Override
 	public boolean mouseReleased(double mouseX, double mouseY, int button) {
-		if (draggingSettingsScrollbar && button == 0) {
-			draggingSettingsScrollbar = false;
-			return true;
-		}
-		if (draggingFilterScrollbar && button == 0) {
-			draggingFilterScrollbar = false;
+		if (draggedScrollbar != null && button == 0) {
+			draggedScrollbar = null;
 			return true;
 		}
 		if (draggedSortRow >= 0 && button == 0) {
@@ -1013,9 +980,7 @@ public class ExplorersCompassScreen extends Screen {
             return true;
         }
         if (hiddenStructuresOpen && par1 == 256) {
-            hiddenStructuresOpen = false;
-            settingsOpen = true;
-            updateViewButtons();
+            leaveHiddenStructures();
             return true;
         }
 		if (settingsOpen && par1 == 256) {
@@ -1040,7 +1005,7 @@ public class ExplorersCompassScreen extends Screen {
 
 	@Override
 	public boolean charTyped(char typedChar, int keyCode) {
-        if (dialog != Dialog.NONE || hiddenStructuresOpen) return true;
+		if (dialog != Dialog.NONE) return true;
 		boolean ret = super.charTyped(typedChar, keyCode);
 		if (searchTextField.isFocused()) {
 			processSearchTerm();
@@ -1049,21 +1014,28 @@ public class ExplorersCompassScreen extends Screen {
 		return ret;
 	}
 
-	private void moveFilterScrollbar(double mouseY) {
-		int maxScroll = filterMaxScroll();
-		if (maxScroll <= 0) {
-			return;
-		}
-		int travel = filterBottom() - filterTop() - filterThumbHeight();
-		filterScroll = MathHelper.clamp((mouseY - filterTop() - filterScrollbarGrabOffset) * maxScroll / travel, 0, maxScroll);
+	private boolean beginScrollbarDrag(ScrollPanel panel, double mouseX, double mouseY) {
+		Scrollbar scrollbar = scrollbarFor(panel);
+		if (!scrollbar.contains(mouseX, mouseY)) return false;
+		int padding = panel == ScrollPanel.SETTINGS ? 0 : Scrollbar.GRAB_PADDING;
+		boolean jump = scrollbar.outsideThumb(mouseY, padding);
+		scrollbarGrabOffset = scrollbar.grabOffset(mouseY, padding);
+		draggedScrollbar = panel;
+		if (jump) moveScrollbar(mouseY);
+		return true;
 	}
 
-	private void moveSettingsScrollbar(double mouseY) {
-		int trackHeight = filterBottom() - filterTop();
-		int thumbHeight = Math.max(12, trackHeight * settingsVisibleRows() / SETTINGS_LABEL_KEYS.length);
-		int travel = Math.max(1, trackHeight - thumbHeight);
-		settingsFirstRow = MathHelper.clamp((int)Math.round((mouseY - filterTop() - settingsScrollbarGrabOffset) * settingsMaxFirstRow() / travel), 0, settingsMaxFirstRow());
-		updateViewButtons();
+	private void moveScrollbar(double mouseY) {
+		if (draggedScrollbar == null) return;
+		double offset = scrollbarFor(draggedScrollbar).offsetForMouse(mouseY, scrollbarGrabOffset);
+		switch (draggedScrollbar) {
+			case FILTERS -> filterScroll = offset;
+			case SETTINGS -> {
+				settingsFirstRow = (int)Math.round(offset);
+				updateViewButtons();
+			}
+			case HIDDEN -> hiddenScroll = (int)Math.round(offset);
+		}
 	}
 
 	private void setFiltersOpen(boolean open) {
@@ -1074,7 +1046,8 @@ public class ExplorersCompassScreen extends Screen {
 			closeSortMenu();
 		}
 		filtersOpen = open;
-		draggingFilterScrollbar = false;
+		if (open) pendingHiddenStructures.clear();
+		draggedScrollbar = null;
 		searchTextField.setVisible(isStructureView());
 		searchTextField.setFocused(false);
 		filterSearchTextField.setVisible(open);
@@ -1096,7 +1069,8 @@ public class ExplorersCompassScreen extends Screen {
 			closeSortMenu();
 		}
 		settingsOpen = open;
-		draggingSettingsScrollbar = false;
+		if (open) pendingHiddenStructures.clear();
+		draggedScrollbar = null;
 		searchTextField.setVisible(isStructureView());
 		searchTextField.setFocused(false);
 		if (open) {
@@ -1143,12 +1117,17 @@ public class ExplorersCompassScreen extends Screen {
     }
 
     public void searchForStructure(Identifier structureID) {
-        if (beginSearch(structureID, false)) ClientPlayNetworking.send(SearchPacket.ID, new SearchPacket(structureID, false, FilterSelections.excludeVisited(), activeRequestId));
+		if (isStructureHidden(structureID)) return;
+        boolean started = beginSearch(structureID, false);
+		finalizePendingHides();
+        if (started) ClientPlayNetworking.send(SearchPacket.ID, new SearchPacket(structureID, false, FilterSelections.excludeVisited(), activeRequestId));
     }
 
     private void searchListed() {
-        if (dialog != Dialog.NONE || structureIDsMatchingSearch.isEmpty()) return;
-        List<Identifier> selected = List.copyOf(structureIDsMatchingSearch);
+        if (dialog != Dialog.NONE) return;
+        List<Identifier> selected = structureIDsMatchingSearch.stream().filter(id -> !isStructureHidden(id)).toList();
+		finalizePendingHides();
+        if (selected.isEmpty()) return;
         List<Identifier> eligible = new ArrayList<>();
         for (Identifier id : selected) if (validDimension(id, false)) eligible.add(id);
         if (eligible.isEmpty()) {
@@ -1467,21 +1446,67 @@ public class ExplorersCompassScreen extends Screen {
 
     private int hiddenVisibleRows() { return Math.max(1, (filterBottom() - filterTop() - 12) / 25); }
 
+	private int hiddenMaxScroll() {
+		return Math.max(0, filteredHiddenStructures().size() - hiddenVisibleRows());
+	}
+
     private void renderHiddenStructures(DrawContext context, int mouseX, int mouseY) {
         context.fill(filterLeft(), filterTop(), filterRight(), filterBottom(), 0xb0000000);
-        if (ExplorersCompassConfig.hiddenStructures.isEmpty()) {
-            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("string.explorerscompass.noHiddenStructures"), width / 2, filterTop() + 20, 0xffffff);
-        }
-        List<String> ids = ExplorersCompassConfig.hiddenStructures;
+        List<String> ids = filteredHiddenStructures();
+        hiddenScroll = MathHelper.clamp(hiddenScroll, 0, Math.max(0, ids.size() - hiddenVisibleRows()));
+        context.enableScissor(filterLeft(), filterTop(), filterRight(), filterBottom());
+        if (ids.isEmpty()) context.drawCenteredTextWithShadow(textRenderer,
+                Text.translatable(ExplorersCompassConfig.hiddenStructures.isEmpty()
+                        ? "string.explorerscompass.noHiddenStructures" : "string.explorerscompass.noMatchingHiddenStructures"),
+                width / 2, filterTop() + 20, 0xffffff);
         for (int row = 0; row < hiddenVisibleRows() && hiddenScroll + row < ids.size(); row++) {
             int y = filterTop() + 6 + row * 25;
             String raw = ids.get(hiddenScroll + row);
             Identifier id = Identifier.tryParse(raw);
             String label = id == null || !allowedStructureIDs.contains(id) ? raw : StructureUtils.getStructureName(id) + " (" + raw + ")";
             context.drawTextWithShadow(textRenderer, textRenderer.trimToWidth(label, Math.max(1, width - 145)), 16, y + 6, 0xffffff);
-            drawDialogButton(context, Text.translatable("string.explorerscompass.unhide").getString(), width - 95, y, 78, mouseX, mouseY);
+            drawDialogButton(context, Text.translatable("string.explorerscompass.remove").getString(), width - 95, y, 78, mouseX, mouseY);
         }
+        context.disableScissor();
+        scrollbarFor(ScrollPanel.HIDDEN).render(context);
     }
+
+	private List<String> filteredHiddenStructures() {
+		String query = hiddenSearchText.toLowerCase(Locale.ROOT);
+		if (query.isEmpty()) return ExplorersCompassConfig.hiddenStructures;
+		List<String> matches = new ArrayList<>();
+		for (String raw : ExplorersCompassConfig.hiddenStructures) {
+			Identifier id = Identifier.tryParse(raw);
+			String name = id == null || !allowedStructureIDs.contains(id) ? raw : StructureUtils.getStructureName(id);
+			if (raw.toLowerCase(Locale.ROOT).contains(query) || name.toLowerCase(Locale.ROOT).contains(query)) matches.add(raw);
+		}
+		return matches;
+	}
+
+	public boolean isStructureHidden(Identifier id) {
+		return ExplorersCompassConfig.hiddenStructures.contains(id.toString());
+	}
+
+	public int rowActionButtonWidth() {
+		return Math.max(textRenderer.getWidth(Text.translatable("string.explorerscompass.hide")),
+				textRenderer.getWidth(Text.translatable("string.explorerscompass.undo"))) + 4;
+	}
+
+	public void toggleStructureHidden(Identifier id) {
+		String raw = id.toString();
+		if (ExplorersCompassConfig.hiddenStructures.remove(raw)) pendingHiddenStructures.remove(id);
+		else {
+			ExplorersCompassConfig.hiddenStructures.add(raw);
+			pendingHiddenStructures.add(id);
+		}
+		ExplorersCompassConfig.save();
+	}
+
+	private void finalizePendingHides() {
+		if (pendingHiddenStructures.isEmpty()) return;
+		pendingHiddenStructures.clear();
+		processSearchTerm();
+	}
 
 	public void teleport() {
 		ClientPlayNetworking.send(TeleportPacket.ID, new TeleportPacket());
@@ -1492,7 +1517,7 @@ public class ExplorersCompassScreen extends Screen {
 		structureIDsMatchingSearch = new ArrayList<Identifier>();
 		String searchTerm = searchTextField.getText().toLowerCase(Locale.ROOT);
 		for (Identifier id : allowedStructureIDs) {
-			if (ExplorersCompassConfig.hiddenStructures.contains(id.toString()) || !FilterSelections.matches(id)) {
+			if ((isStructureHidden(id) && !pendingHiddenStructures.contains(id)) || !FilterSelections.matches(id)) {
 				continue;
 			}
 			if (searchTerm.startsWith("@")) {
@@ -1645,9 +1670,7 @@ public class ExplorersCompassScreen extends Screen {
 		}));
 		backButton = addDrawableChild(new TransparentButton(10, 10, width >= 500 ? 110 : 50, 20, Text.translatable("string.explorerscompass.back"), (onPress) -> {
             if (hiddenStructuresOpen) {
-                hiddenStructuresOpen = false;
-                settingsOpen = true;
-                updateViewButtons();
+                leaveHiddenStructures();
             } else if (settingsOpen) {
 				setSettingsOpen(false);
 			} else {
@@ -1673,6 +1696,31 @@ public class ExplorersCompassScreen extends Screen {
 		});
 		addDrawableChild(filterSearchTextField);
 		filterSearchTextField.setVisible(filtersOpen);
+		int headerEnd = backButton.getX() - SEARCH_TELEPORT_GAP;
+		int hiddenSearchX = Math.min(10 + textRenderer.getWidth(Text.translatable("string.explorerscompass.hiddenBreadcrumb")) + 10,
+				Math.max(10, headerEnd - 80));
+		hiddenSearchTextField = new TransparentTextField(textRenderer, hiddenSearchX, 10,
+				Math.max(1, Math.min(SEARCH_FIELD_WIDTH, headerEnd - hiddenSearchX)),
+				20, Text.translatable("string.explorerscompass.searchHiddenStructures"));
+		hiddenSearchTextField.setMaxLength(256);
+		hiddenSearchTextField.setText(hiddenSearchText);
+		hiddenSearchTextField.setChangedListener(value -> {
+			hiddenSearchText = value;
+			hiddenScroll = 0;
+		});
+		addDrawableChild(hiddenSearchTextField);
+		hiddenSearchTextField.setVisible(hiddenStructuresOpen);
+	}
+
+	private void leaveHiddenStructures() {
+		hiddenStructuresOpen = false;
+		draggedScrollbar = null;
+		settingsOpen = true;
+		hiddenSearchText = "";
+		hiddenSearchTextField.setText("");
+		hiddenSearchTextField.setFocused(false);
+		hiddenScroll = 0;
+		updateViewButtons();
 	}
 
 	private void positionFilterButtons() {
@@ -1719,6 +1767,7 @@ public class ExplorersCompassScreen extends Screen {
 		clearFiltersTopButton.visible = filtersOpen;
 		excludeVisitedButton.visible = filtersOpen && ExplorersCompass.canExcludeVisited;
 		backButton.visible = filtersOpen || settingsOpen || hiddenStructuresOpen;
+		if (hiddenSearchTextField != null) hiddenSearchTextField.setVisible(hiddenStructuresOpen);
 		placeSetting(overlaySideButton, 0);
 		placeSetting(offsetDecreaseButton, 1);
 		placeSetting(offsetIncreaseButton, 1);

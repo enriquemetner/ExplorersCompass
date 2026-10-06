@@ -11,13 +11,11 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.widget.AlwaysSelectedEntryListWidget;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.util.Identifier;
-import net.minecraft.util.math.MathHelper;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
 public class StructureSearchList extends AlwaysSelectedEntryListWidget<StructureSearchEntry> {
-	private static final int SCROLLBAR_WIDTH = 6;
-	private static final int SCROLLBAR_GRAB_PADDING = 2;
+	private static final int SCROLLBAR_WIDTH = Scrollbar.WIDTH;
 
 	private final ExplorersCompassScreen parentScreen;
 	private final PlayerEntity player;
@@ -66,23 +64,14 @@ public class StructureSearchList extends AlwaysSelectedEntryListWidget<Structure
 
 	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double amount) {
-		if (amount != 0 && Math.rint(amount) == amount) {
-			double row = getScrollAmount() / itemHeight - amount;
-			setScrollAmount((amount < 0 ? Math.floor(row) : Math.ceil(row)) * itemHeight);
-		} else {
-			setScrollAmount(getScrollAmount() - amount * itemHeight);
-		}
+		setScrollAmount(Scrollbar.scrollPixels(getScrollAmount(), amount, itemHeight, getMaxScroll()));
 		return true;
 	}
 
-	private int getScrollbarThumbHeight() {
+	private Scrollbar scrollbar() {
 		int viewportHeight = bottom - top;
-		return MathHelper.clamp((int) ((float) (viewportHeight * viewportHeight) / getMaxPosition()), 32, viewportHeight - 8);
-	}
-
-	private int getScrollbarThumbTop() {
-		int travel = bottom - top - getScrollbarThumbHeight();
-		return top + (int) (getScrollAmount() * travel / getMaxScroll());
+		int thumbHeight = Scrollbar.pixelThumbHeight(viewportHeight, getMaxPosition() - viewportHeight, 32, 8);
+		return new Scrollbar(getScrollbarPositionX(), top, bottom, thumbHeight, getScrollAmount(), getMaxScroll());
 	}
 
 	@Override
@@ -91,14 +80,10 @@ public class StructureSearchList extends AlwaysSelectedEntryListWidget<Structure
 			return false;
 		}
 		boolean handled = super.mouseClicked(mouseX, mouseY, button);
-		if (handled && button == 0 && getMaxScroll() > 0
-				&& mouseX >= getScrollbarPositionX() && mouseX < getScrollbarPositionX() + SCROLLBAR_WIDTH) {
-			int thumbTop = getScrollbarThumbTop();
-			int thumbHeight = getScrollbarThumbHeight();
-			if (mouseY < thumbTop - SCROLLBAR_GRAB_PADDING || mouseY >= thumbTop + thumbHeight + SCROLLBAR_GRAB_PADDING) {
-				int travel = bottom - top - thumbHeight;
-				setScrollAmount((mouseY - top - thumbHeight / 2.0) * getMaxScroll() / travel);
-			}
+		Scrollbar scrollbar = scrollbar();
+		if (handled && button == 0 && scrollbar.contains(mouseX, mouseY)
+				&& scrollbar.outsideThumb(mouseY, Scrollbar.GRAB_PADDING)) {
+			setScrollAmount(scrollbar.offsetForMouse(mouseY, scrollbar.grabOffset(mouseY, Scrollbar.GRAB_PADDING)));
 		}
 		return handled;
 	}
@@ -140,14 +125,7 @@ public class StructureSearchList extends AlwaysSelectedEntryListWidget<Structure
 			context.fill(getRowLeft(), rowsBottom, right, bottom, RenderUtils.getBackgroundColor(false, false));
 		}
         // Render scrollbar
-        if (getMaxScroll() > 0) {
-            int scrollbarLeft = getScrollbarPositionX();
-            int scrollbarRight = scrollbarLeft + SCROLLBAR_WIDTH;
-            int scrollbarHeight = getScrollbarThumbHeight();
-            int scrollbarTop = getScrollbarThumbTop();
-            context.fill(scrollbarLeft, top, scrollbarRight, bottom, RenderUtils.getBackgroundColor(false, false));
-            RenderUtils.drawScrollbarThumb(context, scrollbarLeft, scrollbarTop, SCROLLBAR_WIDTH, scrollbarHeight, RenderUtils.getBackgroundColor(true, true));
-        }
+		scrollbar().render(context);
 	}
 
     @Override
@@ -180,6 +158,22 @@ public class StructureSearchList extends AlwaysSelectedEntryListWidget<Structure
 
 	public boolean hasSelection() {
 		return getSelectedOrNull() != null;
+	}
+
+	public boolean isActionButtonClick(StructureSearchEntry entry, double mouseX, double mouseY) {
+		int index = children().indexOf(entry);
+		if (index < 0) return false;
+		int buttonX = getRowLeft() + getRowWidth() - parentScreen.rowActionButtonWidth() - 8;
+		int buttonY = getRowTop(index) + (itemHeight - 20) / 2;
+		return mouseX >= buttonX && mouseX < buttonX + parentScreen.rowActionButtonWidth()
+				&& mouseY >= Math.max(buttonY, top) && mouseY < Math.min(buttonY + 20, fullRowsBottom());
+	}
+
+	public boolean isHideButtonHovered(double mouseX, double mouseY) {
+		if (!isMouseOver(mouseX, mouseY)) return false;
+		StructureSearchEntry entry = getEntryAtPosition(mouseX, mouseY);
+		return entry != null && !parentScreen.isStructureHidden(entry.getStructureID())
+				&& isActionButtonClick(entry, mouseX, mouseY);
 	}
 
 	public ExplorersCompassScreen getParentScreen() {

@@ -35,18 +35,33 @@ public class StructureSearchEntry extends AlwaysSelectedEntryListWidget.Entry<St
 	public void render(DrawContext context, int index, int top, int left, int width, int height, int mouseX, int mouseY, boolean hovered, float tickDelta) {
         int nameColor = isEnabled() ? 0xffffff : 0x808080;
         int infoColor = isEnabled() ? 0x808080 : 0x555555;
-        context.drawText(client.textRenderer, Text.literal(StructureUtils.getStructureName(structureID)), left + 5, top + (height / 2) - ((client.textRenderer.fontHeight + 2) * 2), nameColor, true);
-        context.drawText(client.textRenderer, Text.translatable("string.explorerscompass.source").append(": " + StructureUtils.getStructureSource(structureID)), left + 5, top + (height / 2) - ((client.textRenderer.fontHeight + 2) * 1), infoColor, true);
-        context.drawText(client.textRenderer, Text.translatable("string.explorerscompass.group").append(": " + StructureUtils.getStructureName(ExplorersCompass.structureIDsToGroupIDs.get(structureID))), left + 5, top + (height / 2) - ((client.textRenderer.fontHeight + 2) * 0), infoColor, true);
-        context.drawText(client.textRenderer, Text.translatable("string.explorerscompass.dimension").append(": " + StructureUtils.structureDimensionsToString(ExplorersCompass.allowedStructureIDsToDimensionIDs.get(structureID))), left + 5, top + (height / 2) + ((client.textRenderer.fontHeight + 2) * 1), infoColor, true);
+        int buttonWidth = parentScreen.rowActionButtonWidth();
+        int buttonX = left + width - buttonWidth - 8;
+        int buttonY = top + (height - 20) / 2;
+        int textWidth = Math.max(1, buttonX - left - 10);
+        context.drawText(client.textRenderer, client.textRenderer.trimToWidth(StructureUtils.getStructureName(structureID), textWidth), left + 5, top + (height / 2) - ((client.textRenderer.fontHeight + 2) * 2), nameColor, true);
+        context.drawText(client.textRenderer, client.textRenderer.trimToWidth(Text.translatable("string.explorerscompass.source").getString() + ": " + StructureUtils.getStructureSource(structureID), textWidth), left + 5, top + (height / 2) - ((client.textRenderer.fontHeight + 2) * 1), infoColor, true);
+        context.drawText(client.textRenderer, client.textRenderer.trimToWidth(Text.translatable("string.explorerscompass.group").getString() + ": " + StructureUtils.getStructureName(ExplorersCompass.structureIDsToGroupIDs.get(structureID)), textWidth), left + 5, top + (height / 2) - ((client.textRenderer.fontHeight + 2) * 0), infoColor, true);
+        context.drawText(client.textRenderer, client.textRenderer.trimToWidth(Text.translatable("string.explorerscompass.dimension").getString() + ": " + StructureUtils.structureDimensionsToString(ExplorersCompass.allowedStructureIDsToDimensionIDs.get(structureID)), textWidth), left + 5, top + (height / 2) + ((client.textRenderer.fontHeight + 2) * 1), infoColor, true);
+        boolean buttonHovered = structuresList.isActionButtonClick(this, mouseX, mouseY);
+        context.fill(buttonX, buttonY, buttonX + buttonWidth, buttonY + 20, 0xff909090);
+        context.fill(buttonX + 1, buttonY + 1, buttonX + buttonWidth - 1, buttonY + 19, buttonHovered ? 0xff424242 : 0xff242424);
+        context.drawCenteredTextWithShadow(client.textRenderer, Text.translatable(parentScreen.isStructureHidden(structureID)
+                ? "string.explorerscompass.undo" : "string.explorerscompass.hide"), buttonX + buttonWidth / 2, buttonY + 6, 0xffffff);
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
 	}
 
 	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
 		if (button == 0 && isEnabled()) {
+			if (structuresList.isActionButtonClick(this, mouseX, mouseY)) {
+				client.getSoundManager().play(PositionedSoundInstance.master(SoundEvents.UI_BUTTON_CLICK, 1.0F));
+				parentScreen.toggleStructureHidden(structureID);
+				lastClickTime = 0;
+				return true;
+			}
 			structuresList.setSelected(this);
-			if (Util.getMeasuringTimeMs() - lastClickTime < 250L) {
+			if (!parentScreen.isStructureHidden(structureID) && Util.getMeasuringTimeMs() - lastClickTime < 250L) {
 				searchForStructure();
 				return true;
 			} else {
