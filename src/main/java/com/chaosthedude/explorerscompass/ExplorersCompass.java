@@ -65,7 +65,7 @@ public class ExplorersCompass implements ModInitializer {
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> EXPLORERS_COMPASS_ITEM.cancelSearch(handler.player, -1));
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> VisitedStructures.get(server).forgetPosition(handler.player.getUuid()));
 		ServerTickEvents.END_SERVER_TICK.register(server -> {
-			if (server.getPlayerManager().getPlayerList().isEmpty()) return;
+			if (server.getTicks() % 20 != 0 || server.getPlayerManager().getPlayerList().isEmpty()) return;
 			VisitedStructures history = VisitedStructures.get(server);
 			for (net.minecraft.server.network.ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
 				history.checkPlayer(player);
