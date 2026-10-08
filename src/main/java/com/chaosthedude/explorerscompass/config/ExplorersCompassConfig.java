@@ -3,26 +3,28 @@ package com.chaosthedude.explorerscompass.config;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 
 import com.chaosthedude.explorerscompass.ExplorersCompass;
 import com.chaosthedude.explorerscompass.util.OverlaySide;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.annotations.SerializedName;
+import com.electronwill.nightconfig.core.CommentedConfig;
+import com.electronwill.nightconfig.toml.TomlParser;
+import com.electronwill.nightconfig.toml.TomlWriter;
 
 import net.fabricmc.loader.api.FabricLoader;
+import net.fabricmc.api.EnvType;
 
 public class ExplorersCompassConfig {
-
-	private static Path configFilePath;
-	private static Gson gson = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
+	private static final String COMMON = "common.toml";
+	private static final String CLIENT = "client.toml";
+	private static final String COMMON_BLACKLIST = "common_blacklist.toml";
+	private static final String HIDDEN_STRUCTURES = "hidden_structures.toml";
 
 	public static boolean allowTeleport = true;
 	public static boolean allowExcludeVisited = true;
@@ -31,8 +33,8 @@ public class ExplorersCompassConfig {
 	public static int compassDurability = 0;
 	public static int defaultXpCost = 0;
 	public static boolean allowSearchWithoutEnoughXp = false;
-	public static List<String> structureBlacklist = new ArrayList<String>();
-	public static List<String> hiddenStructures = new ArrayList<String>();
+	public static List<String> structureBlacklist = new ArrayList<>();
+	public static List<String> hiddenStructures = new ArrayList<>();
 
 	public static boolean displayWithChatOpen = true;
 	public static boolean pauseGameWhenOpen = false;
@@ -48,191 +50,193 @@ public class ExplorersCompassConfig {
 	public static List<String> sortOrder = defaultSortOrder();
 
 	private static List<String> defaultSortOrder() {
-		return new ArrayList<String>(Arrays.asList("NAME", "SOURCE", "DIMENSION", "GROUP"));
+		return new ArrayList<>(Arrays.asList("NAME", "SOURCE", "DIMENSION", "GROUP"));
 	}
 
 	private static List<String> normalizeSortOrder(List<String> savedOrder) {
-		if (savedOrder == null || savedOrder.size() != 4 || !new HashSet<String>(savedOrder).equals(new HashSet<String>(defaultSortOrder()))) {
+		if (savedOrder == null || savedOrder.size() != 4 || !new HashSet<>(savedOrder).equals(new HashSet<>(defaultSortOrder()))) {
 			return defaultSortOrder();
 		}
-		return new ArrayList<String>(savedOrder);
+		return new ArrayList<>(savedOrder);
 	}
 
 	public static void load() {
-		Reader reader;
-		if(getFilePath().toFile().exists()) {
-			try {
-				reader = Files.newBufferedReader(getFilePath());
-
-				Data data = gson.fromJson(reader, Data.class);
-
-					allowTeleport = data.common.allowTeleport;
-					allowExcludeVisited = data.common.allowExcludeVisited == null || data.common.allowExcludeVisited;
-				displayCoordinates = data.common.displayCoordinates;
-				maxSamples = data.common.maxSamples;
-				compassDurability = data.common.compassDurability;
-				defaultXpCost = data.common.defaultXpCost;
-				allowSearchWithoutEnoughXp = data.common.allowSearchWithoutEnoughXp != null && data.common.allowSearchWithoutEnoughXp;
-				structureBlacklist = data.common.structureBlacklist;
-
-				displayWithChatOpen = data.client.displayWithChatOpen;
-				pauseGameWhenOpen = data.client.pauseGameWhenOpen;
-				clearFiltersOnClose = data.client.clearFiltersOnClose == null || data.client.clearFiltersOnClose;
-				clearSearchBarOnClose = data.client.clearSearchBarOnClose == null || data.client.clearSearchBarOnClose;
-				closeOnFound = data.client.closeOnFound == null || data.client.closeOnFound;
-				checkedFiltersFirst = data.client.checkedFiltersFirst;
-				adjustRowsToFitView = data.client.adjustRowsToFitView == null || data.client.adjustRowsToFitView;
-				showTechnicalNames = data.client.showTechnicalNames != null && data.client.showTechnicalNames;
-				translateStructureNames = data.client.translateStructureNames;
-				overlayLineOffset = data.client.overlayLineOffset;
-				overlaySide = data.client.overlaySide;
-				sortOrder = normalizeSortOrder(data.client.sortOrder);
-			hiddenStructures = data.client.hiddenStructures == null ? new ArrayList<String>() : new ArrayList<String>(data.client.hiddenStructures);
-
-				reader.close();
-			} catch (IOException e) {
-				throw new RuntimeException(e);
-			}
-		}
-		save();
-	}
-
-	public static void save() {
 		try {
-			Writer writer = Files.newBufferedWriter(getFilePath());
-			Data data = new Data(new Data.Common(allowTeleport, allowExcludeVisited, displayCoordinates, maxSamples, compassDurability, defaultXpCost, allowSearchWithoutEnoughXp, structureBlacklist), new Data.Client(displayWithChatOpen, pauseGameWhenOpen, clearFiltersOnClose, clearSearchBarOnClose, closeOnFound, checkedFiltersFirst, adjustRowsToFitView, showTechnicalNames, translateStructureNames, overlayLineOffset, overlaySide, sortOrder, hiddenStructures));
-			gson.toJson(data, writer);
-			writer.close();
+			Files.createDirectories(directory());
+			boolean client = FabricLoader.getInstance().getEnvironmentType() == EnvType.CLIENT;
+			loadCommon(readOrCreate(COMMON));
+			structureBlacklist = strings(readOrCreate(COMMON_BLACKLIST), "structureBlacklist", structureBlacklist);
+			if (client) {
+				loadClient(readOrCreate(CLIENT));
+				hiddenStructures = strings(readOrCreate(HIDDEN_STRUCTURES), "hiddenStructures", hiddenStructures);
+			}
 		} catch (IOException e) {
-			throw new RuntimeException(e);
+			throw new RuntimeException("Could not load Explorer's Compass configuration", e);
 		}
 	}
 
-	private static Path getFilePath() {
-		if(configFilePath == null) {
-			configFilePath = FabricLoader.getInstance().getConfigDir().resolve(ExplorersCompass.MODID + ".json");
-		}
-		return configFilePath;
+	private static Path directory() {
+		return FabricLoader.getInstance().getConfigDir().resolve(ExplorersCompass.MODID);
 	}
 
-	private static class Data {
-
-		private Common common;
-		private Client client;
-
-		public Data(Common common, Client client) {
-			this.common = common;
-			this.client = client;
+	private static CommentedConfig readOrCreate(String name) throws IOException {
+		Path path = directory().resolve(name);
+		if (Files.exists(path)) return parse(path);
+		CommentedConfig config = CommentedConfig.inMemory();
+		switch (name) {
+			case COMMON -> writeCommon(config);
+			case CLIENT -> writeClient(config);
+			case COMMON_BLACKLIST -> writeCommonBlacklist(config);
+			case HIDDEN_STRUCTURES -> writeHiddenStructures(config);
+			default -> throw new IllegalArgumentException(name);
 		}
+		write(path, config);
+		return config;
+	}
 
-		private static class Common {
-			private final String allowTeleportComment = "Allows a player to teleport to a located structure when in creative mode, opped, or in cheat mode.";
-			private final boolean allowTeleport;
-			private final String allowExcludeVisitedComment = "Allows players to exclude visited structure instances from compass searches. Visits are recorded even when this is disabled.";
-			private final Boolean allowExcludeVisited;
-
-			private final String displayCoordinatesComment = "Allows players to view the precise coordinates and distance of a located structure on the HUD, rather than relying on the direction the compass is pointing.";
-			private final boolean displayCoordinates;
-
-			private final String maxSamplesComment = "The maximum number of samples to be taken when searching for a structure.";
-			private final int maxSamples;
-
-			private final String compassDurabilityComment = "The number of successful structure searches before the compass breaks and must be repaired. Set to 0 to disable durability.";
-			private final int compassDurability;
-
-			private final String defaultXpCostComment = "The default number of XP levels consumed once having located a structure.";
-			@SerializedName(value = "defaultXpCost", alternate = {"defaultCpCost", "defaultXpLevel"})
-			private final int defaultXpCost;
-
-			private final String allowSearchWithoutEnoughXpComment = "Allows searches when the player has fewer XP levels than defaultXpCost. On a successful locate, their XP is depleted to zero.";
-			private final Boolean allowSearchWithoutEnoughXp;
-
-			private final String structureBlacklistComment = "A list of structures that the compass will not display in the GUI and will not be able to search for. The wildcard character * can be used to match any number of characters, and ? can be used to match one character. Ex (ignore backslashes): [\"minecraft:stronghold\", \"minecraft:endcity\", \"minecraft:*village*\"]";
-			private final List<String> structureBlacklist;
-
-			private Common() {
-					allowTeleport = true;
-					allowExcludeVisited = true;
-				displayCoordinates = true;
-				maxSamples = 100000;
-				compassDurability = 0;
-				defaultXpCost = 0;
-				allowSearchWithoutEnoughXp = false;
-				structureBlacklist = new ArrayList<String>();
-			}
-
-			private Common(boolean allowTeleport, boolean allowExcludeVisited, boolean displayCoordinates, int maxSamples, int compassDurability, int defaultXpCost, boolean allowSearchWithoutEnoughXp, List<String> structureBlacklist) {
-					this.allowTeleport = allowTeleport;
-					this.allowExcludeVisited = allowExcludeVisited;
-				this.displayCoordinates = displayCoordinates;
-				this.maxSamples = maxSamples;
-				this.compassDurability = compassDurability;
-				this.defaultXpCost = defaultXpCost;
-				this.allowSearchWithoutEnoughXp = allowSearchWithoutEnoughXp;
-				this.structureBlacklist = structureBlacklist;
-			}
-		}
-
-		private static class Client {
-			private final String displayWithChatOpenComment = "Displays compass information even while chat is open.";
-			private final boolean displayWithChatOpen;
-			private final String pauseGameWhenOpenComment = "Pauses the game in single-player while the compass screen is open.";
-			private final boolean pauseGameWhenOpen;
-			private final String clearFiltersOnCloseComment = "Clears selected structure filters when the compass screen closes.";
-			private final Boolean clearFiltersOnClose;
-			private final String clearSearchBarOnCloseComment = "Clears the structure search bar when the compass screen closes.";
-			private final Boolean clearSearchBarOnClose;
-			private final Boolean closeOnFound;
-			private final String checkedFiltersFirstComment = "Displays checked filter options above unchecked options in each filter column.";
-			private final boolean checkedFiltersFirst;
-			private final String adjustRowsToFitViewComment = "Adjusts row spacing, showing less content but only fully visible list entries. Smooth scrolling may still show partial entries.";
-			private final Boolean adjustRowsToFitView;
-			private final String showTechnicalNamesComment = "Shows each structure's technical ID next to its readable name and allows searching by ID.";
-			private final Boolean showTechnicalNames;
-
-			private final String translateStructureNamesComment = "Attempts to translate structure names before fixing the unlocalized names. Translations may not be available for all structures.";
-			private final boolean translateStructureNames;
-
-			private final String overlayLineOffsetComment = "The line offset for information rendered on the HUD.";
-			private final int overlayLineOffset;
-
-			private final String overlaySideComment = "The side for information rendered on the HUD. Ex: LEFT, RIGHT";
-			private final OverlaySide overlaySide;
-			private final List<String> sortOrder;
-			private final List<String> hiddenStructures;
-
-			private Client() {
-				displayWithChatOpen = true;
-				pauseGameWhenOpen = false;
-				clearFiltersOnClose = true;
-				clearSearchBarOnClose = true;
-				closeOnFound = true;
-				checkedFiltersFirst = true;
-				adjustRowsToFitView = true;
-				showTechnicalNames = false;
-				translateStructureNames = true;
-				overlayLineOffset = 0;
-				overlaySide = OverlaySide.LEFT;
-				sortOrder = defaultSortOrder();
-			hiddenStructures = new ArrayList<String>();
-			}
-
-			private Client(boolean displayWithChatOpen, boolean pauseGameWhenOpen, boolean clearFiltersOnClose, boolean clearSearchBarOnClose, boolean closeOnFound, boolean checkedFiltersFirst, boolean adjustRowsToFitView, boolean showTechnicalNames, boolean translateStructureNames, int overlayLineOffset, OverlaySide overlaySide, List<String> sortOrder, List<String> hiddenStructures) {
-				this.displayWithChatOpen = displayWithChatOpen;
-				this.pauseGameWhenOpen = pauseGameWhenOpen;
-				this.clearFiltersOnClose = clearFiltersOnClose;
-				this.clearSearchBarOnClose = clearSearchBarOnClose;
-				this.closeOnFound = closeOnFound;
-				this.checkedFiltersFirst = checkedFiltersFirst;
-				this.adjustRowsToFitView = adjustRowsToFitView;
-				this.showTechnicalNames = showTechnicalNames;
-				this.translateStructureNames = translateStructureNames;
-				this.overlayLineOffset = overlayLineOffset;
-				this.overlaySide = overlaySide;
-				this.sortOrder = normalizeSortOrder(sortOrder);
-				this.hiddenStructures = new ArrayList<String>(hiddenStructures);
-			}
+	private static CommentedConfig parse(Path path) throws IOException {
+		try (Reader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
+			return new TomlParser().parse(reader);
+		} catch (RuntimeException e) {
+			throw new IllegalArgumentException("Invalid TOML in " + path, e);
 		}
 	}
 
+	private static void write(Path path, CommentedConfig config) throws IOException {
+		Files.createDirectories(path.getParent());
+		try (Writer writer = Files.newBufferedWriter(path, StandardCharsets.UTF_8)) {
+			new TomlWriter().write(config, writer);
+		}
+	}
+
+	private static boolean bool(CommentedConfig config, String key, boolean fallback) {
+		Object value = config.get(key);
+		if (value == null) return fallback;
+		if (value instanceof Boolean result) return result;
+		throw bad(key, "boolean");
+	}
+
+	private static int number(CommentedConfig config, String key, int fallback, int minimum) {
+		Object value = config.get(key);
+		if (value == null) return fallback;
+		if (!(value instanceof Number number) || !Double.isFinite(number.doubleValue())
+				|| number.doubleValue() != number.longValue()
+				|| number.longValue() < minimum || number.longValue() > Integer.MAX_VALUE) throw bad(key, "integer >= " + minimum);
+		return number.intValue();
+	}
+
+	private static List<String> strings(CommentedConfig config, String key, List<String> fallback) {
+		Object value = config.get(key);
+		if (value == null) return new ArrayList<>(fallback);
+		if (!(value instanceof List<?> list)) throw bad(key, "string array");
+		List<String> result = new ArrayList<>();
+		for (Object item : list) {
+			if (!(item instanceof String entry)) throw bad(key, "string array");
+			result.add(entry);
+		}
+		return result;
+	}
+
+	private static IllegalArgumentException bad(String key, String expected) {
+		return new IllegalArgumentException("Invalid Explorer's Compass setting '" + key + "'; expected " + expected);
+	}
+
+	private static void loadCommon(CommentedConfig config) {
+		allowTeleport = bool(config, "permissions.allowTeleport", allowTeleport);
+		allowExcludeVisited = bool(config, "search.allowExcludeVisited", allowExcludeVisited);
+		displayCoordinates = bool(config, "compass.displayCoordinates", displayCoordinates);
+		maxSamples = number(config, "search.maxSamples", maxSamples, 1);
+		compassDurability = number(config, "compass.compassDurability", compassDurability, 0);
+		defaultXpCost = number(config, "search.defaultXpCost", defaultXpCost, 0);
+		allowSearchWithoutEnoughXp = bool(config, "search.allowSearchWithoutEnoughXp", allowSearchWithoutEnoughXp);
+	}
+
+	private static void loadClient(CommentedConfig config) {
+		displayWithChatOpen = bool(config, "overlay.displayWithChatOpen", displayWithChatOpen);
+		pauseGameWhenOpen = bool(config, "behavior.pauseGameWhenOpen", pauseGameWhenOpen);
+		clearFiltersOnClose = bool(config, "behavior.clearFiltersOnClose", clearFiltersOnClose);
+		clearSearchBarOnClose = bool(config, "behavior.clearSearchBarOnClose", clearSearchBarOnClose);
+		closeOnFound = bool(config, "behavior.closeOnFound", closeOnFound);
+		checkedFiltersFirst = bool(config, "view.checkedFiltersFirst", checkedFiltersFirst);
+		adjustRowsToFitView = bool(config, "view.adjustRowsToFitView", adjustRowsToFitView);
+		showTechnicalNames = bool(config, "view.showTechnicalNames", showTechnicalNames);
+		translateStructureNames = bool(config, "view.translateStructureNames", translateStructureNames);
+		overlayLineOffset = number(config, "overlay.overlayLineOffset", overlayLineOffset, Integer.MIN_VALUE);
+		Object side = config.get("overlay.overlaySide");
+		if (side != null) {
+			try {
+				overlaySide = OverlaySide.valueOf((String) side);
+			} catch (ClassCastException | IllegalArgumentException e) {
+				throw bad("overlay.overlaySide", "LEFT or RIGHT");
+			}
+		}
+		List<String> order = strings(config, "view.sortOrder", sortOrder);
+		if (!normalizeSortOrder(order).equals(order)) throw bad("view.sortOrder", "permutation of NAME, SOURCE, DIMENSION, GROUP");
+		sortOrder = order;
+	}
+
+	private static void put(CommentedConfig config, String key, Object value, String comment) {
+		config.set(key, value);
+		if (config.getComment(key) == null) config.setComment(key, comment);
+	}
+
+	private static void writeCommon(CommentedConfig config) {
+		put(config, "permissions.allowTeleport", allowTeleport, "Allow teleporting to a located structure when permitted by player permissions.");
+		put(config, "search.allowExcludeVisited", allowExcludeVisited, "Allow players to exclude visited structure instances from searches. Visits are always recorded.");
+		put(config, "compass.displayCoordinates", displayCoordinates, "Show precise coordinates and distance for located structures.");
+		put(config, "search.maxSamples", maxSamples, "Maximum search samples; must be at least 1.");
+		put(config, "compass.compassDurability", compassDurability, "Successful searches before the compass breaks; 0 disables durability.");
+		put(config, "search.defaultXpCost", defaultXpCost, "XP levels consumed after a successful search.");
+		put(config, "search.allowSearchWithoutEnoughXp", allowSearchWithoutEnoughXp, "Permit searching with insufficient XP; a successful search drains remaining XP.");
+	}
+
+	private static void writeClient(CommentedConfig config) {
+		put(config, "overlay.displayWithChatOpen", displayWithChatOpen, "Show compass information while chat is open.");
+		put(config, "behavior.pauseGameWhenOpen", pauseGameWhenOpen, "Pause single-player while the compass screen is open.");
+		put(config, "behavior.clearFiltersOnClose", clearFiltersOnClose, "Clear filters when the compass screen closes.");
+		put(config, "behavior.clearSearchBarOnClose", clearSearchBarOnClose, "Clear the search bar when the compass screen closes.");
+		put(config, "behavior.closeOnFound", closeOnFound, "Close the compass screen after finding a structure.");
+		put(config, "view.checkedFiltersFirst", checkedFiltersFirst, "Show checked filters before unchecked filters.");
+		put(config, "view.adjustRowsToFitView", adjustRowsToFitView, "Adjust row spacing so list entries fit the view.");
+		put(config, "view.showTechnicalNames", showTechnicalNames, "Show and search technical structure IDs.");
+		put(config, "view.translateStructureNames", translateStructureNames, "Translate structure names where translations exist.");
+		put(config, "overlay.overlayLineOffset", overlayLineOffset, "Vertical line offset of the HUD overlay.");
+		put(config, "overlay.overlaySide", overlaySide.name(), "HUD overlay side: LEFT or RIGHT.");
+		put(config, "view.sortOrder", sortOrder, "Order of the four structure sorting keys.");
+	}
+
+	private static void writeCommonBlacklist(CommentedConfig config) {
+		put(config, "structureBlacklist", structureBlacklist, "Structures excluded from the compass. Supports * and ? wildcards.");
+	}
+
+	private static void writeHiddenStructures(CommentedConfig config) {
+		put(config, "hiddenStructures", hiddenStructures, "Structures hidden from this client's compass list.");
+	}
+
+	private static void saveFile(String name, java.util.function.Consumer<CommentedConfig> update) {
+		try {
+			Path path = directory().resolve(name);
+			CommentedConfig config = Files.exists(path) ? parse(path) : CommentedConfig.inMemory();
+			update.accept(config);
+			write(path, config);
+		} catch (IOException e) {
+			throw new RuntimeException("Could not save Explorer's Compass " + name, e);
+		}
+	}
+
+	public static void saveClient() {
+		saveFile(CLIENT, ExplorersCompassConfig::writeClient);
+	}
+
+	public static void saveCommon() {
+		saveFile(COMMON, ExplorersCompassConfig::writeCommon);
+	}
+
+	public static void saveCommonBlacklist() {
+		saveFile(COMMON_BLACKLIST, ExplorersCompassConfig::writeCommonBlacklist);
+	}
+
+	public static void saveHiddenStructures() {
+		saveFile(HIDDEN_STRUCTURES, ExplorersCompassConfig::writeHiddenStructures);
+	}
 }
