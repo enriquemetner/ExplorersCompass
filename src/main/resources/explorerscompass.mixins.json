@@ -3,7 +3,8 @@
   "package": "com.chaosthedude.explorerscompass.mixins",
   "compatibilityLevel": "JAVA_8",
   "mixins": [
-    "MinecraftServerMixin"
+    "MinecraftServerMixin",
+    "PlayerAdvancementTrackerMixin"
   ],
   "client": [
     "HeldItemRendererMixin",

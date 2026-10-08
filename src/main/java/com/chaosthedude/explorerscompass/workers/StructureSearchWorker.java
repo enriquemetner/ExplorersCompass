@@ -91,6 +91,8 @@ public abstract class StructureSearchWorker<T extends StructurePlacement> implem
 
 	protected Pair<BlockPos, Structure> getStructureGeneratingAt(ChunkPos chunkPos) {
 		for (Structure structure : structureSet) {
+            Identifier id = StructureUtils.getIDForStructure(level, structure);
+            if (id == null || !com.chaosthedude.explorerscompass.unlocking.UnlockingRules.isUnlocked(level.getServer(), player.getUuid(), id)) continue;
 			StructurePresence result = level.getStructureAccessor().getStructurePresence(chunkPos, structure, false);
 			if (result != StructurePresence.START_NOT_PRESENT) {
 				if (result == StructurePresence.START_PRESENT) {

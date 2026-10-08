@@ -1,0 +1,26 @@
+{
+  "default": "lockedUntilVisited",
+  "rules": {
+    "nether_access": {
+      "unlocks": {
+        "structures": ["minecraft:fortress", "minecraft:bastion_remnant"]
+      },
+      "description": "Visit any village and complete Stone Age.",
+      "condition": {
+        "all": [
+          {"type": "visit", "structureSet": "minecraft:villages", "match": "any"},
+          {"type": "advancement", "advancements": ["minecraft:story/mine_stone"]}
+        ]
+      }
+    },
+    "village_access": {
+      "unlocks": {"structureSet": "minecraft:villages"},
+      "condition": {
+        "any": [
+          {"type": "visit", "structures": ["minecraft:fortress", "minecraft:stronghold"], "match": "all"},
+          {"type": "advancement", "advancements": ["minecraft:story/mine_diamond", "minecraft:end/dragon_egg"], "match": "all"}
+        ]
+      }
+    }
+  }
+}

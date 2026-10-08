@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.LinkedHashSet;
 
 import com.chaosthedude.explorerscompass.ExplorersCompass;
+import com.chaosthedude.explorerscompass.unlocking.UnlockingRules;
 import com.chaosthedude.explorerscompass.config.ExplorersCompassConfig;
 import com.chaosthedude.explorerscompass.gui.GuiWrapper;
 import com.chaosthedude.explorerscompass.network.SyncPacket;
@@ -144,12 +145,13 @@ public class ExplorersCompassItem extends Item {
 			} else {
 				final ServerWorld serverWorld = (ServerWorld) world;
 				final ServerPlayerEntity serverPlayer = (ServerPlayerEntity) player;
+				UnlockingRules.get().evaluateOnOpen(serverPlayer);
 				final boolean canTeleport = ExplorersCompassConfig.allowTeleport && PlayerUtils.canTeleport(player);
 				final boolean hasInfiniteXp = player.getAbilities().creativeMode;
 				final List<Identifier> allowedStructures = StructureUtils.getAllowedStructureIDs(serverWorld);
 				final ListMultimap<Identifier, Identifier> dimensionsForAllowedStructures = StructureUtils.getGeneratingDimensionIDsForAllowedStructures(serverWorld, allowedStructures);
 				final Map<Identifier, Identifier> structureIDsToGroupIDs = StructureUtils.getStructureIDsToGroupIDs(serverWorld);
-				ServerPlayNetworking.send(serverPlayer, SyncPacket.ID, new SyncPacket(canTeleport, ExplorersCompassConfig.allowExcludeVisited, hasInfiniteXp, ExplorersCompassConfig.defaultXpCost, ExplorersCompassConfig.allowSearchWithoutEnoughXp, allowedStructures, dimensionsForAllowedStructures, structureIDsToGroupIDs));
+				ServerPlayNetworking.send(serverPlayer, SyncPacket.ID, new SyncPacket(canTeleport, ExplorersCompassConfig.allowExcludeVisited, hasInfiniteXp, ExplorersCompassConfig.defaultXpCost, ExplorersCompassConfig.allowSearchWithoutEnoughXp, allowedStructures, dimensionsForAllowedStructures, structureIDsToGroupIDs, UnlockingRules.get().lockedRequirements(serverPlayer, allowedStructures)));
 			}
 		} else {
 			cancelSearch(player, -1);
@@ -189,15 +191,12 @@ public class ExplorersCompassItem extends Item {
 	}
 
 	public void searchForStructure(ServerWorld world, PlayerEntity player, BlockPos pos, Identifier structureOrGroupId, boolean isGroup, boolean excludeVisited, ItemStack stack, int requestId) {
+        if (isGroup || !UnlockingRules.isUnlocked(world.getServer(), player.getUuid(), structureOrGroupId)) {
+            SearchResultPacket.send((ServerPlayerEntity) player, requestId, SearchResultPacket.REJECTED, 0);
+            return;
+        }
 		if (!isBroken(stack)) {
-
-
-			List<Identifier> structureIds;
-			if (isGroup) {
-				structureIds = StructureUtils.getStructuresForGroup(world, structureOrGroupId);
-			} else {
-				structureIds = List.of(structureOrGroupId);
-			}
+            List<Identifier> structureIds = List.of(structureOrGroupId);
 
 			List<Structure> structures = new ArrayList<Structure>();
             structureIds = searchableInDimension(world, structureIds);
@@ -234,6 +233,11 @@ public class ExplorersCompassItem extends Item {
             return;
         }
         List<Identifier> uniqueIds = new ArrayList<>(new LinkedHashSet<>(requestedIds));
+        uniqueIds.removeIf(id -> !UnlockingRules.isUnlocked(world.getServer(), player.getUuid(), id));
+        if (uniqueIds.isEmpty()) {
+            SearchResultPacket.send((ServerPlayerEntity) player, requestId, SearchResultPacket.REJECTED, 0);
+            return;
+        }
         List<Identifier> searchable = searchableInDimension(world, uniqueIds);
         if (searchable.size() != uniqueIds.size()) {
             rejectWrongDimension(player, stack, requestId);

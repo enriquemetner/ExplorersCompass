@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.chaosthedude.explorerscompass.ExplorersCompass;
+import com.chaosthedude.explorerscompass.unlocking.RequirementNode;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ListMultimap;
 
@@ -20,7 +21,7 @@ public class SyncPacket extends PacketByteBuf {
 
 	public static final Identifier ID = new Identifier(ExplorersCompass.MODID, "sync");
 
-	public SyncPacket(boolean canTeleport, boolean canExcludeVisited, boolean infiniteXp, int defaultXpCost, boolean allowSearchWithoutEnoughXp, List<Identifier> allowedStructureIDs, ListMultimap<Identifier, Identifier> allowedStructureIDsToDimensionIDs, Map<Identifier, Identifier> structureIDsToGroupIDs) {
+ public SyncPacket(boolean canTeleport, boolean canExcludeVisited, boolean infiniteXp, int defaultXpCost, boolean allowSearchWithoutEnoughXp, List<Identifier> allowedStructureIDs, ListMultimap<Identifier, Identifier> allowedStructureIDsToDimensionIDs, Map<Identifier, Identifier> structureIDsToGroupIDs, Map<Identifier, RequirementNode> lockedRequirements) {
 		super(Unpooled.buffer());
 		writeBoolean(canTeleport);
 		writeBoolean(canExcludeVisited);
@@ -38,6 +39,16 @@ public class SyncPacket extends PacketByteBuf {
 			Identifier groupID = structureIDsToGroupIDs.get(structureID);
 			writeIdentifier(groupID);
 		}
+        // Source/set rules often share a tree across many structures; send each tree once.
+        List<RequirementNode> descriptions = new ArrayList<>(new java.util.LinkedHashSet<>(lockedRequirements.values()));
+        writeInt(descriptions.size());
+        for (RequirementNode node : descriptions) node.write(this);
+        writeInt(lockedRequirements.size());
+        for (Map.Entry<Identifier, RequirementNode> entry : lockedRequirements.entrySet()) {
+            writeIdentifier(entry.getKey());
+            writeInt(descriptions.indexOf(entry.getValue()));
+        }
+
 	}
 
 	public static void apply(MinecraftClient client, ClientPlayNetworkHandler handler, PacketByteBuf buf, PacketSender responseSender) {
@@ -67,7 +78,15 @@ public class SyncPacket extends PacketByteBuf {
 			}
 		}
 
+        List<RequirementNode> descriptions = new ArrayList<>();
+        int descriptionCount = buf.readInt();
+        for (int i = 0; i < descriptionCount; i++) descriptions.add(RequirementNode.read(buf));
+        Map<Identifier, RequirementNode> lockedRequirements = new HashMap<>();
+        int lockedCount = buf.readInt();
+        for (int i = 0; i < lockedCount; i++) lockedRequirements.put(buf.readIdentifier(), descriptions.get(buf.readInt()));
+
 		client.execute(() -> {
+			ExplorersCompass.lockedRequirements = Map.copyOf(lockedRequirements);
 			ExplorersCompass.synced = true;
 			ExplorersCompass.canTeleport = canTeleport;
 			ExplorersCompass.canExcludeVisited = canExcludeVisited;

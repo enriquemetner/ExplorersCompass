@@ -93,13 +93,33 @@ public final class VisitedStructures extends PersistentState {
 			if (structureId == null) continue;
 			ChunkPos startChunk = start.getPos();
 			Visit visit = new Visit(dimension, structureId, startChunk.x, startChunk.z);
-			if (visits.computeIfAbsent(player.getUuid(), ignored -> new HashSet<>()).add(visit)) markDirty();
+			if (visits.computeIfAbsent(player.getUuid(), ignored -> new HashSet<>()).add(visit)) {
+                markDirty();
+                com.chaosthedude.explorerscompass.unlocking.UnlockingRules.get().onProgress(player, structureId, null);
+            }
 		}
 	}
 
 	public void forgetPosition(UUID playerId) {
 		lastChecked.remove(playerId);
 	}
+
+    public boolean hasVisitedType(UUID player, Identifier structure) {
+        return visits.getOrDefault(player, Set.of()).stream().anyMatch(visit -> visit.structure.equals(structure));
+    }
+
+    /** A null structure clears all instances of every type. */
+    public int clear(UUID player, Identifier structure) {
+        Set<Visit> saved = visits.get(player);
+        if (saved == null) return 0;
+        int before = saved.size();
+        saved.removeIf(visit -> structure == null || visit.structure.equals(structure));
+        int removed = before - saved.size();
+        if (saved.isEmpty()) visits.remove(player);
+        forgetPosition(player);
+        if (removed > 0) markDirty();
+        return removed;
+    }
 
 	public boolean hasVisited(UUID playerId, Identifier dimension, Identifier structure, ChunkPos startChunk) {
 		return visits.getOrDefault(playerId, Set.of()).contains(new Visit(dimension, structure, startChunk.x, startChunk.z));

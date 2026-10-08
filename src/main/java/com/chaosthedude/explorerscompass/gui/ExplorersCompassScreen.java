@@ -122,8 +122,9 @@ public class ExplorersCompassScreen extends Screen {
     private boolean hiddenStructuresOpen;
     private int hiddenScroll;
     private ButtonWidget hiddenStructuresButton;
-    private enum Dialog { NONE, WRONG_DIMENSION, INSUFFICIENT_XP, SEARCHING, FOUND, NOT_FOUND, REJECTED }
+    private enum Dialog { NONE, LOCKED, WRONG_DIMENSION, INSUFFICIENT_XP, SEARCHING, FOUND, NOT_FOUND, REJECTED }
     private Dialog dialog = Dialog.NONE;
+    private LockedRequirementsView lockedRequirementsView;
     private int insufficientXpCost;
     private long dialogStarted;
     private long notFoundCompassUpdated;
@@ -208,6 +209,7 @@ public class ExplorersCompassScreen extends Screen {
 
 	@Override
 	public boolean mouseScrolled(double scroll1, double scroll2, double scroll3) {
+        if (dialog == Dialog.LOCKED) { lockedRequirementsView.scroll(scroll3); return true; }
         if (dialog != Dialog.NONE) return true;
         if (hiddenStructuresOpen) {
             hiddenScroll = Scrollbar.scrollRows(hiddenScroll, scroll3, 2, hiddenMaxScroll());
@@ -872,6 +874,10 @@ public class ExplorersCompassScreen extends Screen {
 	}
 
 	private boolean handleMouseClicked(double mouseX, double mouseY, int button) {
+        if (dialog == Dialog.LOCKED) {
+            if (lockedRequirementsView.click(mouseX, mouseY, button, width, height)) dismissDialog();
+            return true;
+        }
         if (dialog != Dialog.NONE) {
             if (dialog == Dialog.WRONG_DIMENSION || dialog == Dialog.INSUFFICIENT_XP) { dismissDialog(); return true; }
             if (button == 0) {
@@ -974,6 +980,7 @@ public class ExplorersCompassScreen extends Screen {
 
 	@Override
 	public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+        if (dialog == Dialog.LOCKED) { lockedRequirementsView.drag(mouseY); return true; }
 		if (draggedScrollbar != null && button == 0) {
 			moveScrollbar(mouseY);
 			return true;
@@ -995,6 +1002,7 @@ public class ExplorersCompassScreen extends Screen {
 
 	@Override
 	public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (dialog == Dialog.LOCKED) { lockedRequirementsView.release(); return true; }
 		if (draggedScrollbar != null && button == 0) {
 			draggedScrollbar = null;
 			return true;
@@ -1011,6 +1019,7 @@ public class ExplorersCompassScreen extends Screen {
 	public boolean keyPressed(int par1, int par2, int par3) {
         if (dialog != Dialog.NONE) {
             if (par1 == 256) dismissDialog();
+            else if (dialog == Dialog.LOCKED) lockedRequirementsView.keyPressed(par1);
             return true;
         }
 		if (isStructureView() && !sortMenuOpen) {
@@ -1148,6 +1157,10 @@ public class ExplorersCompassScreen extends Screen {
 
     private boolean beginSearch(Identifier id, boolean group) {
         if (dialog != Dialog.NONE || id == null) return false;
+        if (isStructureLocked(id)) {
+            showLockedRequirements(ExplorersCompass.lockedRequirements.get(id));
+            return false;
+        }
         if (!validDimension(id, group)) {
             showWrongDimension(true);
             return false;
@@ -1178,6 +1191,12 @@ public class ExplorersCompassScreen extends Screen {
         List<Identifier> selected = structureIDsMatchingSearch.stream().filter(id -> !isStructureHidden(id)).toList();
 		finalizePendingHides();
         if (selected.isEmpty()) return;
+        selected = selected.stream().filter(id -> !isStructureLocked(id)).toList();
+        if (selected.isEmpty()) {
+            showLockedRequirements(new com.chaosthedude.explorerscompass.unlocking.RequirementNode(
+                    Text.translatable("string.explorerscompass.noUnlockedListed"), false, java.util.List.of()));
+            return;
+        }
         List<Identifier> eligible = new ArrayList<>();
         for (Identifier id : selected) if (validDimension(id, false)) eligible.add(id);
         if (eligible.isEmpty()) {
@@ -1390,7 +1409,20 @@ public class ExplorersCompassScreen extends Screen {
         context.drawTooltip(textRenderer, lines, mouseX, mouseY);
     }
 
+    public boolean isStructureLocked(Identifier id) {
+        return ExplorersCompass.lockedRequirements.containsKey(id);
+    }
+
+    private void showLockedRequirements(com.chaosthedude.explorerscompass.unlocking.RequirementNode requirements) {
+        lockedRequirementsView = new LockedRequirementsView(textRenderer, requirements);
+        dialog = Dialog.LOCKED;
+    }
+
     private void renderSearchDialog(DrawContext context, int mouseX, int mouseY) {
+        if (dialog == Dialog.LOCKED) {
+            lockedRequirementsView.render(context, width, height, mouseX, mouseY);
+            return;
+        }
         int w = dialogWidth(), x = dialogX(), y = dialogY(), h = dialogHeight();
         context.getMatrices().push();
         context.getMatrices().translate(0, 0, 300);

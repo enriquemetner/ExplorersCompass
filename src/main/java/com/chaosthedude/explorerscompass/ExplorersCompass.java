@@ -39,6 +39,7 @@ public class ExplorersCompass implements ModInitializer {
 
 	public static final ExplorersCompassItem EXPLORERS_COMPASS_ITEM = new ExplorersCompassItem();
 
+	public static Map<Identifier, com.chaosthedude.explorerscompass.unlocking.RequirementNode> lockedRequirements = Map.of();
 	public static boolean synced;
 	public static boolean canTeleport;
 	public static boolean canExcludeVisited;
@@ -52,6 +53,12 @@ public class ExplorersCompass implements ModInitializer {
 	@Override
 	public void onInitialize() {
 		ExplorersCompassConfig.load();
+        net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents.SERVER_STARTED.register(
+                com.chaosthedude.explorerscompass.unlocking.UnlockingRules::reload);
+        net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents.SERVER_STOPPED.register(server ->
+                com.chaosthedude.explorerscompass.unlocking.UnlockingRules.clear());
+        net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
+                com.chaosthedude.explorerscompass.unlocking.UnlockingCommands.register(dispatcher));
 
 		Registry.register(Registries.ITEM, new Identifier(MODID, "explorerscompass"), EXPLORERS_COMPASS_ITEM);
 

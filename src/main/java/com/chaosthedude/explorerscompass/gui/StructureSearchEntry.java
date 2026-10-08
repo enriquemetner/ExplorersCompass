@@ -34,8 +34,9 @@ public class StructureSearchEntry extends AlwaysSelectedEntryListWidget.Entry<St
 
 	@Override
 	public void render(DrawContext context, int index, int top, int left, int width, int height, int mouseX, int mouseY, boolean hovered, float tickDelta) {
-        int nameColor = isEnabled() ? 0xffffff : 0x808080;
-        int infoColor = isEnabled() ? 0x808080 : 0x555555;
+        boolean locked = parentScreen.isStructureLocked(structureID);
+        int nameColor = !locked ? 0xffffff : 0xc0c0c0;
+        int infoColor = !locked ? 0x808080 : 0x707070;
         int buttonWidth = parentScreen.rowActionButtonWidth();
         int buttonX = left + width - buttonWidth - 8;
         int buttonY = top + (height - 20) / 2;
@@ -68,6 +69,11 @@ public class StructureSearchEntry extends AlwaysSelectedEntryListWidget.Entry<St
         context.fill(buttonX + 1, buttonY + 1, buttonX + buttonWidth - 1, buttonY + 19, buttonHovered ? 0xff424242 : 0xff242424);
         context.drawCenteredTextWithShadow(client.textRenderer, Text.translatable(parentScreen.isStructureHidden(structureID)
                 ? "string.explorerscompass.undo" : "string.explorerscompass.hide"), buttonX + buttonWidth / 2, buttonY + 6, 0xffffff);
+        if (locked) {
+            context.fill(left, top, left + width, top + height, 0x33000000);
+            context.drawCenteredTextWithShadow(client.textRenderer, Text.translatable("string.explorerscompass.locked"),
+                    left + width / 2, top + (height - client.textRenderer.fontHeight) / 2, 0xffffff);
+        }
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
 	}
 
@@ -111,7 +117,8 @@ public class StructureSearchEntry extends AlwaysSelectedEntryListWidget.Entry<St
 
 	@Override
 	public Text getNarration() {
-		return Text.literal(StructureUtils.getStructureName(structureID));
+		return Text.literal(StructureUtils.getStructureName(structureID)).append(parentScreen.isStructureLocked(structureID)
+                ? Text.literal(". ").append(Text.translatable("string.explorerscompass.locked")) : Text.empty());
 	}
 
 }
