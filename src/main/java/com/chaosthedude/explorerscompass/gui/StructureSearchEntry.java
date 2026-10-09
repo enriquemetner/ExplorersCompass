@@ -61,17 +61,17 @@ public class StructureSearchEntry extends AlwaysSelectedEntryListWidget.Entry<St
         } else {
             context.drawText(client.textRenderer, client.textRenderer.trimToWidth(readableName, textWidth), left + 5, nameY, nameColor, true);
         }
-        context.drawText(client.textRenderer, client.textRenderer.trimToWidth(Text.translatable("string.explorerscompass.source").getString() + ": " + StructureUtils.getStructureSource(structureID), textWidth), left + 5, top + (height / 2) - ((client.textRenderer.fontHeight + 2) * 1), infoColor, true);
-        context.drawText(client.textRenderer, client.textRenderer.trimToWidth(Text.translatable("string.explorerscompass.group").getString() + ": " + StructureUtils.getStructureName(ExplorersCompass.structureIDsToGroupIDs.get(structureID)), textWidth), left + 5, top + (height / 2) - ((client.textRenderer.fontHeight + 2) * 0), infoColor, true);
-        context.drawText(client.textRenderer, client.textRenderer.trimToWidth(Text.translatable("string.explorerscompass.dimension").getString() + ": " + StructureUtils.structureDimensionsToString(ExplorersCompass.allowedStructureIDsToDimensionIDs.get(structureID)), textWidth), left + 5, top + (height / 2) + ((client.textRenderer.fontHeight + 2) * 1), infoColor, true);
+        context.drawText(client.textRenderer, client.textRenderer.trimToWidth(Text.literal("Source").getString() + ": " + StructureUtils.getStructureSource(structureID), textWidth), left + 5, top + (height / 2) - ((client.textRenderer.fontHeight + 2) * 1), infoColor, true);
+        context.drawText(client.textRenderer, client.textRenderer.trimToWidth(Text.literal("Group").getString() + ": " + StructureUtils.getStructureName(ExplorersCompass.structureIDsToGroupIDs.get(structureID)), textWidth), left + 5, top + (height / 2) - ((client.textRenderer.fontHeight + 2) * 0), infoColor, true);
+        context.drawText(client.textRenderer, client.textRenderer.trimToWidth(Text.literal("Dimension").getString() + ": " + StructureUtils.structureDimensionsToString(ExplorersCompass.allowedStructureIDsToDimensionIDs.get(structureID)), textWidth), left + 5, top + (height / 2) + ((client.textRenderer.fontHeight + 2) * 1), infoColor, true);
         boolean buttonHovered = structuresList.isActionButtonClick(this, mouseX, mouseY);
         context.fill(buttonX, buttonY, buttonX + buttonWidth, buttonY + 20, 0xff909090);
         context.fill(buttonX + 1, buttonY + 1, buttonX + buttonWidth - 1, buttonY + 19, buttonHovered ? 0xff424242 : 0xff242424);
-        context.drawCenteredTextWithShadow(client.textRenderer, Text.translatable(parentScreen.isStructureHidden(structureID)
-                ? "string.explorerscompass.undo" : "string.explorerscompass.hide"), buttonX + buttonWidth / 2, buttonY + 6, 0xffffff);
+        context.drawCenteredTextWithShadow(client.textRenderer, Text.literal(parentScreen.isStructureHidden(structureID)
+                ? "Undo" : "Hide"), buttonX + buttonWidth / 2, buttonY + 6, 0xffffff);
         if (locked) {
             context.fill(left, top, left + width, top + height, 0x33000000);
-            context.drawCenteredTextWithShadow(client.textRenderer, Text.translatable("string.explorerscompass.locked"),
+            context.drawCenteredTextWithShadow(client.textRenderer, Text.literal("Locked"),
                     left + width / 2, top + (height - client.textRenderer.fontHeight) / 2, 0xffffff);
         }
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
@@ -118,7 +118,7 @@ public class StructureSearchEntry extends AlwaysSelectedEntryListWidget.Entry<St
 	@Override
 	public Text getNarration() {
 		return Text.literal(StructureUtils.getStructureName(structureID)).append(parentScreen.isStructureLocked(structureID)
-                ? Text.literal(". ").append(Text.translatable("string.explorerscompass.locked")) : Text.empty());
+                ? Text.literal(". ").append(Text.literal("Locked")) : Text.empty());
 	}
 
 }

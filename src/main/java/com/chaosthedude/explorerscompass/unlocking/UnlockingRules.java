@@ -31,7 +31,6 @@ import net.minecraft.structure.StructureSet;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import net.minecraft.util.Identifier;
-import net.minecraft.util.Util;
 
 /** Server-owned rule definitions. Reloading replaces definitions without touching player data. */
 public final class UnlockingRules {
@@ -285,7 +284,7 @@ public final class UnlockingRules {
 
     private static RequirementNode visitNode(Set<Identifier> required, boolean all, Set<Identifier> known, Progress progress) {
         List<RequirementNode> children = required.stream().map(id -> new RequirementNode(
-                Text.translatableWithFallback(Util.createTranslationKey("structure", id), readable(id)).formatted(Formatting.AQUA),
+                Text.literal(readable(id)).formatted(Formatting.AQUA),
                 known.contains(id) && progress.visited(id), List.of())).toList();
         boolean checked = !children.isEmpty() && (all ? children.stream().allMatch(RequirementNode::checked)
                 : children.stream().anyMatch(RequirementNode::checked));

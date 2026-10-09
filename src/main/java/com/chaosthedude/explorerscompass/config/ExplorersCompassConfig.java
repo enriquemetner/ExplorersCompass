@@ -44,7 +44,6 @@ public class ExplorersCompassConfig {
 	public static boolean checkedFiltersFirst = true;
 	public static boolean adjustRowsToFitView = true;
 	public static boolean showTechnicalNames = false;
-	public static boolean translateStructureNames = true;
 	public static int overlayLineOffset = 0;
 	public static OverlaySide overlaySide = OverlaySide.LEFT;
 	public static List<String> sortOrder = defaultSortOrder();
@@ -160,7 +159,6 @@ public class ExplorersCompassConfig {
 		checkedFiltersFirst = bool(config, "view.checkedFiltersFirst", checkedFiltersFirst);
 		adjustRowsToFitView = bool(config, "view.adjustRowsToFitView", adjustRowsToFitView);
 		showTechnicalNames = bool(config, "view.showTechnicalNames", showTechnicalNames);
-		translateStructureNames = bool(config, "view.translateStructureNames", translateStructureNames);
 		overlayLineOffset = number(config, "overlay.overlayLineOffset", overlayLineOffset, Integer.MIN_VALUE);
 		Object side = config.get("overlay.overlaySide");
 		if (side != null) {
@@ -199,7 +197,6 @@ public class ExplorersCompassConfig {
 		put(config, "view.checkedFiltersFirst", checkedFiltersFirst, "Show checked filters before unchecked filters.");
 		put(config, "view.adjustRowsToFitView", adjustRowsToFitView, "Adjust row spacing so list entries fit the view.");
 		put(config, "view.showTechnicalNames", showTechnicalNames, "Show and search technical structure IDs.");
-		put(config, "view.translateStructureNames", translateStructureNames, "Translate structure names where translations exist.");
 		put(config, "overlay.overlayLineOffset", overlayLineOffset, "Vertical line offset of the HUD overlay.");
 		put(config, "overlay.overlaySide", overlaySide.name(), "HUD overlay side: LEFT or RIGHT.");
 		put(config, "view.sortOrder", sortOrder, "Order of the four structure sorting keys.");

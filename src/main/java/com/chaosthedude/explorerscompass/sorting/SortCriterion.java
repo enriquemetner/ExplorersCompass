@@ -9,16 +9,16 @@ import net.minecraft.util.Identifier;
 
 @Environment(EnvType.CLIENT)
 public enum SortCriterion {
-	NAME("name", new NameSorting()),
-	SOURCE("source", new SourceSorting()),
-	DIMENSION("dimension", new DimensionSorting()),
-	GROUP("group", new GroupSorting());
+	NAME("Name", new NameSorting()),
+	SOURCE("Source", new SourceSorting()),
+	DIMENSION("Dimension", new DimensionSorting()),
+	GROUP("Group", new GroupSorting());
 
-	private final String translationSuffix;
+	private final String label;
 	private final ISorting comparator;
 
-	SortCriterion(String translationSuffix, ISorting comparator) {
-		this.translationSuffix = translationSuffix;
+	SortCriterion(String label, ISorting comparator) {
+		this.label = label;
 		this.comparator = comparator;
 	}
 
@@ -27,6 +27,6 @@ public enum SortCriterion {
 	}
 
 	public Text getLabel() {
-		return Text.translatable("string.explorerscompass." + translationSuffix);
+		return Text.literal(label);
 	}
 }

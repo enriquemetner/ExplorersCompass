@@ -18,7 +18,6 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
-import net.minecraft.client.resource.language.I18n;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.registry.Registry;
 import net.minecraft.registry.RegistryKey;
@@ -28,7 +27,6 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.structure.StructureSet;
 import net.minecraft.structure.StructureSet.WeightedEntry;
 import net.minecraft.util.Identifier;
-import net.minecraft.util.Util;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.world.biome.Biome;
@@ -151,18 +149,7 @@ public class StructureUtils {
 		if (id == null) {
 			return "";
 		}
-		String name = id.toString();
-		if (ExplorersCompassConfig.translateStructureNames) {
-			name = I18n.translate(Util.createTranslationKey("structure", id));
-		}
-		if (name.equals(Util.createTranslationKey("structure", id)) || !ExplorersCompassConfig.translateStructureNames) {
-			name = id.toString();
-			if (name.contains(":")) {
-				name = name.substring(name.indexOf(":") + 1);
-			}
-			name = WordUtils.capitalize(name.replace('_', ' '));
-		}
-		return name;
+		return WordUtils.capitalize(id.getPath().replace('_', ' '));
 	}
 
 	@Environment(EnvType.CLIENT)
@@ -196,15 +183,10 @@ public class StructureUtils {
 
 	@Environment(EnvType.CLIENT)
 	public static String getDimensionName(Identifier dimensionKey) {
-		String name = I18n.translate(Util.createTranslationKey("dimension", dimensionKey));
-		if (name.equals(Util.createTranslationKey("dimension", dimensionKey))) {
-			name = dimensionKey.toString();
-			if (name.contains(":")) {
-				name = name.substring(name.indexOf(":") + 1);
-			}
-			name = WordUtils.capitalize(name.replace('_', ' '));
+		if (dimensionKey == null) {
+			return "";
 		}
-		return name;
+		return WordUtils.capitalize(dimensionKey.getPath().replace('_', ' '));
 	}
 
 	private static Registry<Structure> getStructureRegistry(ServerWorld world) {

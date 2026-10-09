@@ -21,7 +21,6 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.hud.InGameHud;
 import net.minecraft.client.gui.screen.ChatScreen;
-import net.minecraft.client.resource.language.I18n;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 
@@ -39,14 +38,14 @@ public class InGameHudMixin {
         ItemStack stack = ItemUtils.getHeldItem(player, ExplorersCompass.EXPLORERS_COMPASS_ITEM);
         if (!(stack.getItem() instanceof ExplorersCompassItem compass) || compass.getState(stack) != CompassState.FOUND) return;
 
-        RenderUtils.drawConfiguredStringOnHUD(context, I18n.translate("string.explorerscompass.structure"), client.textRenderer, 5, 5, 0xFFFFFF, 0);
+        RenderUtils.drawConfiguredStringOnHUD(context, "Structure", client.textRenderer, 5, 5, 0xFFFFFF, 0);
         RenderUtils.drawConfiguredStringOnHUD(context, StructureUtils.getStructureName(compass.getStructureID(stack)), client.textRenderer, 5, 5, 0xAAAAAA, 1);
         if (!compass.isInFoundDimension(stack, player.getWorld())) {
-            RenderUtils.drawConfiguredStringOnHUD(context, I18n.translate("string.explorerscompass.wrongDimensionHud"), client.textRenderer, 5, 5, 0xFF4444, 3);
+            RenderUtils.drawConfiguredStringOnHUD(context, "Wrong Dimension", client.textRenderer, 5, 5, 0xFF4444, 3);
         } else if (compass.shouldDisplayCoordinates(stack)) {
-            RenderUtils.drawConfiguredStringOnHUD(context, I18n.translate("string.explorerscompass.distance"), client.textRenderer, 5, 5, 0xFFFFFF, 3);
+            RenderUtils.drawConfiguredStringOnHUD(context, "Distance", client.textRenderer, 5, 5, 0xFFFFFF, 3);
             RenderUtils.drawConfiguredStringOnHUD(context, String.valueOf(StructureUtils.getHorizontalDistanceToLocation(player, compass.getFoundStructureX(stack), compass.getFoundStructureZ(stack))), client.textRenderer, 5, 5, 0xAAAAAA, 4);
-            RenderUtils.drawConfiguredStringOnHUD(context, I18n.translate("string.explorerscompass.coordinates"), client.textRenderer, 5, 5, 0xFFFFFF, 6);
+            RenderUtils.drawConfiguredStringOnHUD(context, "Coordinates", client.textRenderer, 5, 5, 0xFFFFFF, 6);
             RenderUtils.drawConfiguredStringOnHUD(context, compass.getFoundStructureX(stack) + ", " + compass.getFoundStructureZ(stack), client.textRenderer, 5, 5, 0xAAAAAA, 7);
         }
     }

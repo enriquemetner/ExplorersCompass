@@ -4,7 +4,6 @@ import com.chaosthedude.explorerscompass.util.StructureUtils;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
-import net.minecraft.client.resource.language.I18n;
 import net.minecraft.util.Identifier;
 
 @Environment(EnvType.CLIENT)
@@ -27,7 +26,7 @@ public class SourceSorting implements ISorting {
 
 	@Override
 	public String getLocalizedName() {
-		return I18n.translate("string.explorerscompass.source");
+		return "Source";
 	}
 
 }

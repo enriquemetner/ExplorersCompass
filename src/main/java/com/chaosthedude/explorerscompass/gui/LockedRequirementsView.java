@@ -78,7 +78,7 @@ final class LockedRequirementsView {
         context.fill(0, 0, screenWidth, screenHeight, 0x88000000);
         context.fill(x - 1, y - 1, x + width + 1, backTop() + 26, 0xff909090);
         context.fill(x, y, x + width, backTop() + 25, 0xff000000);
-        context.drawCenteredTextWithShadow(renderer, Text.translatable("string.explorerscompass.locked"), x + width / 2, y + 10, 0xffff5555);
+        context.drawCenteredTextWithShadow(renderer, Text.literal("Locked"), x + width / 2, y + 10, 0xffff5555);
         context.enableScissor(x + 10, bodyTop(), x + width - 18, bodyTop() + bodyHeight);
         int first = Math.max(0, (int) scroll / lineHeight);
         int last = Math.min(lines.size(), first + bodyHeight / lineHeight + 2);
@@ -100,7 +100,7 @@ final class LockedRequirementsView {
         boolean hovered = mouseX >= buttonX && mouseX < buttonX + 70 && mouseY >= backTop() && mouseY < backTop() + 20;
         context.fill(buttonX, backTop(), buttonX + 70, backTop() + 20, 0xff909090);
         context.fill(buttonX + 1, backTop() + 1, buttonX + 69, backTop() + 19, hovered ? 0xff424242 : 0xff242424);
-        context.drawCenteredTextWithShadow(renderer, Text.translatable("string.explorerscompass.back"), x + width / 2, backTop() + 6, 0xffffff);
+        context.drawCenteredTextWithShadow(renderer, Text.literal("Back"), x + width / 2, backTop() + 6, 0xffffff);
         context.getMatrices().pop();
         if (hoveredAdvancement != null) {
             int tooltipWidth = Math.max(20, Math.min(240, screenWidth - 40));

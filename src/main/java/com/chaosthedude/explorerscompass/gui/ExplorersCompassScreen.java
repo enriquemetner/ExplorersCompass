@@ -66,19 +66,31 @@ public class ExplorersCompassScreen extends Screen {
 	private static final int HIDE_BUTTON_WIDTH = 100;
 	private static final int KEEP_SEARCHING_BUTTON_WIDTH = 100;
 	private static final int NOT_FOUND_BUTTON_GAP = 5;
-	private static final String[] SETTINGS_LABEL_KEYS = {
-		"string.explorerscompass.overlaySide",
-		"string.explorerscompass.overlayLineOffset",
-		"string.explorerscompass.clearSearchBarOnClose",
-		"string.explorerscompass.clearFiltersOnClose",
-		"string.explorerscompass.checkedFiltersFirst",
-		"string.explorerscompass.adjustRowsToFitView",
-		"string.explorerscompass.closeOnFound",
-		"string.explorerscompass.displayWithChatOpen",
-		"string.explorerscompass.showTechnicalNames",
-		"string.explorerscompass.translateStructureNames",
-		"string.explorerscompass.pauseGameWhenOpen",
-        "string.explorerscompass.hiddenStructures"
+	private static final String[] SETTINGS_LABELS = {
+		"HUD Side",
+		"HUD Line Offset",
+		"Clear Search Bar on Close",
+		"Clear Filters on Close",
+		"Checked Filters on Top",
+		"Adjust Rows to Fit View",
+		"Close UI when located",
+		"Show While Chat Is Open",
+		"Show Technical Names",
+		"Pause Game When Open (Singleplayer)",
+		"Hidden Structures",
+	};
+	private static final String[] SETTINGS_TOOLTIPS = {
+		"Choose whether compass information appears on the left or right side of the HUD.",
+		"Move compass information vertically. Higher values move it down; lower values move it up.",
+		"Clears the search bar when you close the compass screen.",
+		"Clear selected structure filters when you close the compass screen.",
+		"Show checked options above unchecked options in each filter column. The selection itself does not change.",
+		"Adjusts row spacing, showing less content but only fully visible list entries. Smooth scrolling may still show partial entries.",
+		"Close the compass screen when a structure is located.",
+		"Keep compass information visible while the chat screen is open.",
+		"Show structure IDs beside their names and include them in search results.",
+		"Pauses singleplayer while the compass screen is open, except while locating a structure.",
+		"View and restore structures hidden on this client.",
 	};
 
 	private World world;
@@ -95,7 +107,6 @@ public class ExplorersCompassScreen extends Screen {
 	private ButtonWidget settingsButton;
 	private ButtonWidget chatOverlayButton;
 	private ButtonWidget showTechnicalNamesButton;
-	private ButtonWidget translateNamesButton;
 	private ButtonWidget overlaySideButton;
 	private ButtonWidget clearOnCloseButton;
 	private ButtonWidget clearSearchBarOnCloseButton;
@@ -170,7 +181,7 @@ public class ExplorersCompassScreen extends Screen {
 	}
 
 	public ExplorersCompassScreen(World world, PlayerEntity player, ItemStack stack, ExplorersCompassItem explorersCompass, List<Identifier> allowedStructureIDs) {
-		super(Text.translatable("string.explorerscompass.selectStructure"));
+		super(Text.literal("Select Structure"));
 		this.world = world;
 		this.player = player;
 		this.stack = stack;
@@ -309,7 +320,7 @@ public class ExplorersCompassScreen extends Screen {
 			int iconX = searchListedButton.getX() + searchListedButton.getWidth() - 12;
 			int iconY = searchListedButton.getY() + searchListedButton.getHeight() / 2;
 			drawQuestionIcon(context, iconX, iconY);
-			if (insideQuestionIcon(mouseX, mouseY, iconX, iconY)) drawQuestionTooltip(context, "string.explorerscompass.searchListed.tooltip", mouseX, mouseY);
+			if (insideQuestionIcon(mouseX, mouseY, iconX, iconY)) drawQuestionTooltip(context, "Searches for any structure from the current list after applied filters and search bar results.", mouseX, mouseY);
 		}
 		renderCrossIcon(context, cancelButton);
 		if (clearFiltersButton.visible) {
@@ -325,13 +336,13 @@ public class ExplorersCompassScreen extends Screen {
 			context.getMatrices().pop();
 		}
 		if (filtersOpen) {
-			context.drawTextWithShadow(textRenderer, Text.translatable("string.explorerscompass.filters"), 10, 15, 0xffffff);
+			context.drawTextWithShadow(textRenderer, Text.literal("Filters"), 10, 15, 0xffffff);
         } else if (hiddenStructuresOpen) {
-            String breadcrumb = Text.translatable("string.explorerscompass.hiddenBreadcrumb").getString();
+            String breadcrumb = Text.literal("Settings > Hidden Structures").getString();
             context.drawTextWithShadow(textRenderer, textRenderer.trimToWidth(breadcrumb,
                     Math.max(1, hiddenSearchTextField.getX() - 20)), 10, 15, 0xffffff);
 		} else if (settingsOpen) {
-			context.drawTextWithShadow(textRenderer, Text.translatable("string.explorerscompass.settings"), 10, 15, 0xffffff);
+			context.drawTextWithShadow(textRenderer, Text.literal("Settings"), 10, 15, 0xffffff);
 		} else {
 			context.drawCenteredTextWithShadow(textRenderer, title, 65, 15, 0xffffff);
 		}
@@ -339,7 +350,7 @@ public class ExplorersCompassScreen extends Screen {
 			renderSettingsTooltip(context, mouseX, mouseY);
 		}
 		if (isStructureView() && dialog == Dialog.NONE && !sortMenuOpen && selectionList.isHideButtonHovered(mouseX, mouseY)) {
-			drawQuestionTooltip(context, "string.explorerscompass.hide.tooltip", mouseX, mouseY);
+			drawQuestionTooltip(context, "Removes the structure from the list on this client, across all worlds and servers. You can undo this in Settings.", mouseX, mouseY);
 		}
         if (dialog != Dialog.NONE) renderSearchDialog(context, mouseX, mouseY);
 	}
@@ -571,7 +582,7 @@ public class ExplorersCompassScreen extends Screen {
 			case FILTERS -> new Scrollbar(filterRight(), filterTop(), filterBottom(),
 					Scrollbar.pixelThumbHeight(trackHeight, filterMaxScroll(), 32, 8), filterScroll, filterMaxScroll());
 			case SETTINGS -> new Scrollbar(filterRight(), filterTop(), filterBottom(),
-					Scrollbar.rowThumbHeight(trackHeight, settingsVisibleRows(), SETTINGS_LABEL_KEYS.length), settingsFirstRow, settingsMaxFirstRow());
+					Scrollbar.rowThumbHeight(trackHeight, settingsVisibleRows(), SETTINGS_LABELS.length), settingsFirstRow, settingsMaxFirstRow());
 			case HIDDEN -> new Scrollbar(filterRight(), filterTop(), filterBottom(),
 					Scrollbar.rowThumbHeight(trackHeight, hiddenVisibleRows(), filteredHiddenStructures().size()), hiddenScroll, hiddenMaxScroll());
 		};
@@ -605,14 +616,14 @@ public class ExplorersCompassScreen extends Screen {
 		for (Identifier group : groups) {
 			filterOptions.get(2).add(new FilterOption(StructureUtils.getStructureName(group), null, group, false));
 		}
-		Collator collator = languageCollator();
+		Collator collator = englishCollator();
 		Comparator<FilterOption> alphabetical = Comparator.comparing((FilterOption option) -> option.label, collator)
 				.thenComparing(option -> option.source != null ? option.source : option.id.toString());
 		for (List<FilterOption> options : filterOptions) {
 			options.sort(alphabetical);
 		}
 		filterOptions.get(0).sort(Comparator.comparing((FilterOption option) -> !"minecraft".equals(option.source)).thenComparing(alphabetical));
-		filterOptions.get(1).add(0, new FilterOption(Text.translatable("string.explorerscompass.current").getString(), null, world.getRegistryKey().getValue(), true));
+		filterOptions.get(1).add(0, new FilterOption(Text.literal("Current").getString(), null, world.getRegistryKey().getValue(), true));
 		filterScroll = MathHelper.clamp(filterScroll, 0, filterMaxScroll());
 	}
 
@@ -683,7 +694,7 @@ public class ExplorersCompassScreen extends Screen {
 	}
 
 	private int settingsMaxFirstRow() {
-		return Math.max(0, SETTINGS_LABEL_KEYS.length - settingsVisibleRows());
+		return Math.max(0, SETTINGS_LABELS.length - settingsVisibleRows());
 	}
 
 	private int settingsControlHeight() {
@@ -698,8 +709,8 @@ public class ExplorersCompassScreen extends Screen {
 		context.fill(filterLeft(), filterTop(), filterRight(), filterBottom(), 0xb0000000);
 		int labelX = filterLeft() + 10;
 		int labelWidth = Math.max(1, settingsControlX() - labelX - 10);
-		for (int row = settingsFirstRow; row < Math.min(SETTINGS_LABEL_KEYS.length, settingsFirstRow + settingsVisibleRows()); row++) {
-			String label = Text.translatable(SETTINGS_LABEL_KEYS[row]).getString();
+		for (int row = settingsFirstRow; row < Math.min(SETTINGS_LABELS.length, settingsFirstRow + settingsVisibleRows()); row++) {
+			String label = SETTINGS_LABELS[row];
 			int labelY = settingsRowY(row) + (settingsControlHeight() - textRenderer.fontHeight) / 2;
 			int textWidth = textRenderer.getWidth(label);
 			if (textWidth <= labelWidth) {
@@ -731,12 +742,12 @@ public class ExplorersCompassScreen extends Screen {
 			return;
 		}
 		int row = settingsFirstRow + (mouseY - settingsRowY(settingsFirstRow)) / SETTINGS_ROW_HEIGHT;
-		if (row >= SETTINGS_LABEL_KEYS.length || row >= settingsFirstRow + settingsVisibleRows()) {
+		if (row >= SETTINGS_LABELS.length || row >= settingsFirstRow + settingsVisibleRows()) {
 			return;
 		}
 		int labelX = filterLeft() + 10;
 		int labelWidth = Math.max(1, settingsControlX() - labelX - 10);
-		String label = Text.translatable(SETTINGS_LABEL_KEYS[row]).getString();
+		String label = SETTINGS_LABELS[row];
 		int textWidth = textRenderer.getWidth(label);
 		float scale = Math.min(1.0f, (float) labelWidth / Math.max(1, textWidth));
 		double textTop = settingsRowY(row) + (settingsControlHeight() - textRenderer.fontHeight) / 2.0f
@@ -746,7 +757,7 @@ public class ExplorersCompassScreen extends Screen {
 			return;
 		}
 		List<Text> lines = new ArrayList<>();
-		for (OrderedText line : textRenderer.wrapLines(Text.translatable(SETTINGS_LABEL_KEYS[row] + ".tooltip"), Math.min(240, width - 30))) {
+		for (OrderedText line : textRenderer.wrapLines(Text.literal(SETTINGS_TOOLTIPS[row]), Math.min(240, width - 30))) {
 			StringBuilder content = new StringBuilder();
 			line.accept((index, style, codePoint) -> {
 				content.appendCodePoint(codePoint);
@@ -758,17 +769,19 @@ public class ExplorersCompassScreen extends Screen {
 	}
 
 	private void updateSettingsButtonLabels() {
-		chatOverlayButton.setMessage(Text.translatable(ExplorersCompassConfig.displayWithChatOpen ? "options.on" : "options.off"));
-		showTechnicalNamesButton.setMessage(Text.translatable(ExplorersCompassConfig.showTechnicalNames ? "options.on" : "options.off"));
-		translateNamesButton.setMessage(Text.translatable(ExplorersCompassConfig.translateStructureNames ? "options.on" : "options.off"));
-		clearOnCloseButton.setMessage(Text.translatable(ExplorersCompassConfig.clearFiltersOnClose ? "options.on" : "options.off"));
-		clearSearchBarOnCloseButton.setMessage(Text.translatable(ExplorersCompassConfig.clearSearchBarOnClose ? "options.on" : "options.off"));
-		pauseGameWhenOpenButton.setMessage(Text.translatable(ExplorersCompassConfig.pauseGameWhenOpen ? "options.on" : "options.off"));
-		checkedFiltersFirstButton.setMessage(Text.translatable(ExplorersCompassConfig.checkedFiltersFirst ? "options.on" : "options.off"));
-		closeOnFoundButton.setMessage(Text.translatable(ExplorersCompassConfig.closeOnFound ? "options.on" : "options.off"));
-		adjustRowsToFitViewButton.setMessage(Text.translatable(ExplorersCompassConfig.adjustRowsToFitView ? "options.on" : "options.off"));
-		overlaySideButton.setMessage(Text.translatable(ExplorersCompassConfig.overlaySide == OverlaySide.LEFT
-				? "string.explorerscompass.left" : "string.explorerscompass.right"));
+		chatOverlayButton.setMessage(onOff(ExplorersCompassConfig.displayWithChatOpen));
+		showTechnicalNamesButton.setMessage(onOff(ExplorersCompassConfig.showTechnicalNames));
+		clearOnCloseButton.setMessage(onOff(ExplorersCompassConfig.clearFiltersOnClose));
+		clearSearchBarOnCloseButton.setMessage(onOff(ExplorersCompassConfig.clearSearchBarOnClose));
+		pauseGameWhenOpenButton.setMessage(onOff(ExplorersCompassConfig.pauseGameWhenOpen));
+		checkedFiltersFirstButton.setMessage(onOff(ExplorersCompassConfig.checkedFiltersFirst));
+		closeOnFoundButton.setMessage(onOff(ExplorersCompassConfig.closeOnFound));
+		adjustRowsToFitViewButton.setMessage(onOff(ExplorersCompassConfig.adjustRowsToFitView));
+		overlaySideButton.setMessage(Text.literal(ExplorersCompassConfig.overlaySide == OverlaySide.LEFT ? "Left" : "Right"));
+	}
+
+	private static Text onOff(boolean enabled) {
+		return Text.literal(enabled ? "On" : "Off");
 	}
 
 	private void renderFilterPanel(DrawContext context, int mouseX, int mouseY) {
@@ -790,9 +803,9 @@ public class ExplorersCompassScreen extends Screen {
 			}
 		}
 		String[] headings = {
-			Text.translatable("string.explorerscompass.source").getString(),
-			Text.translatable("string.explorerscompass.dimension").getString(),
-			Text.translatable("string.explorerscompass.group").getString()
+			Text.literal("Source").getString(),
+			Text.literal("Dimension").getString(),
+			Text.literal("Group").getString()
 		};
 		for (int column = showSourceColumn ? 0 : 1; column < 3; column++) {
 			int columnLeft = filterColumnLeft(column);
@@ -1194,7 +1207,7 @@ public class ExplorersCompassScreen extends Screen {
         selected = selected.stream().filter(id -> !isStructureLocked(id)).toList();
         if (selected.isEmpty()) {
             showLockedRequirements(new com.chaosthedude.explorerscompass.unlocking.RequirementNode(
-                    Text.translatable("string.explorerscompass.noUnlockedListed"), false, java.util.List.of()));
+                    Text.literal("There are no unlocked structures in the current list."), false, java.util.List.of()));
             return;
         }
         List<Identifier> eligible = new ArrayList<>();
@@ -1312,10 +1325,10 @@ public class ExplorersCompassScreen extends Screen {
 
     private int dialogWidth() {
         if (dialog == Dialog.WRONG_DIMENSION) {
-            return Math.min(width - 20, textRenderer.getWidth(Text.translatable("string.explorerscompass.wrongDimension")) + 12);
+            return Math.min(width - 20, textRenderer.getWidth(Text.literal("You're in the wrong dimension, buddy!")) + 12);
         }
         if (dialog == Dialog.INSUFFICIENT_XP) {
-            return Math.min(width - 20, Math.max(textRenderer.getWidth(Text.translatable("string.explorerscompass.insufficientXp")), xpCostLineWidth()) + 12);
+            return Math.min(width - 20, Math.max(textRenderer.getWidth(Text.literal("You don't have enough levels, buddy!")), xpCostLineWidth()) + 12);
         }
         if (dialog == Dialog.FOUND) {
             int leftWidth = 0;
@@ -1329,7 +1342,7 @@ public class ExplorersCompassScreen extends Screen {
             contentWidth = Math.max(245, contentWidth);
             return Math.min(width - 20, contentWidth);
         }
-        if (dialog == Dialog.NOT_FOUND) return Math.min(width - 20, Math.max(245, textRenderer.getWidth(Text.translatable("string.explorerscompass.notFoundWithin", failedRadius)) + 16));
+        if (dialog == Dialog.NOT_FOUND) return Math.min(width - 20, Math.max(245, textRenderer.getWidth(Text.literal("Couldn't locate structure within " + failedRadius + " blocks")) + 16));
         return Math.min(width - 20, 245);
     }
     private int searchingBackY() { return searchedListed ? (listedSkippedCount > 0 ? 89 : 77) : 65; }
@@ -1337,30 +1350,30 @@ public class ExplorersCompassScreen extends Screen {
     private int notFoundKeepX() { return dialogX() + (dialogWidth() - KEEP_SEARCHING_BUTTON_WIDTH - NOT_FOUND_BUTTON_GAP - HIDE_BUTTON_WIDTH) / 2; }
     private int notFoundHideX() { return notFoundKeepX() + KEEP_SEARCHING_BUTTON_WIDTH + NOT_FOUND_BUTTON_GAP; }
     private int notFoundBackY() { return notFoundHideY() + 23; }
-    private Text wrongDimensionCountText() { return Text.translatable(listedSkippedCount == 1 ? "string.explorerscompass.wrongDimensionCountOne" : "string.explorerscompass.wrongDimensionCount", listedSkippedCount); }
+    private Text wrongDimensionCountText() { return Text.literal("Wrong dimension for " + listedSkippedCount + (listedSkippedCount == 1 ? " structure" : " structures")); }
     private int dialogHeight() { return dialog == Dialog.WRONG_DIMENSION ? textRenderer.fontHeight + 12 : dialog == Dialog.INSUFFICIENT_XP ? textRenderer.fontHeight * 2 + 16 : dialog == Dialog.SEARCHING ? searchingBackY() + 25 : dialog == Dialog.FOUND ? (ExplorersCompass.canTeleport ? 142 : 119) : dialog == Dialog.NOT_FOUND ? notFoundBackY() + 25 : 80; }
     private int dialogX() { return (width - dialogWidth()) / 2; }
     private int dialogY() { return (height - dialogHeight()) / 2; }
 
     private int xpCostLineWidth() {
-        return textRenderer.getWidth(Text.translatable("string.explorerscompass.xpCost")) + 3
+        return textRenderer.getWidth(Text.literal("XP Cost:")) + 3
                 + 5 + 3 + textRenderer.getWidth(Integer.toString(insufficientXpCost));
     }
 
     private Text[] foundInfoLines() {
         Identifier groupId = foundStructureId == null ? null : ExplorersCompass.structureIDsToGroupIDs.get(foundStructureId);
         return new Text[] {
-            Text.translatable("string.explorerscompass.name").append(": ").append(Text.literal(StructureUtils.getStructureName(foundStructureId)).formatted(Formatting.GRAY)),
-            Text.translatable("string.explorerscompass.source").append(": ").append(Text.literal(StructureUtils.getStructureSource(foundStructureId)).formatted(Formatting.GRAY)),
-            Text.translatable("string.explorerscompass.group").append(": ").append(Text.literal(StructureUtils.getStructureName(groupId)).formatted(Formatting.GRAY))
+            Text.literal("Name").append(": ").append(Text.literal(StructureUtils.getStructureName(foundStructureId)).formatted(Formatting.GRAY)),
+            Text.literal("Source").append(": ").append(Text.literal(StructureUtils.getStructureSource(foundStructureId)).formatted(Formatting.GRAY)),
+            Text.literal("Group").append(": ").append(Text.literal(StructureUtils.getStructureName(groupId)).formatted(Formatting.GRAY))
         };
     }
 
     private Text[] foundLocationLines() {
         int distance = client.player == null ? 0 : StructureUtils.getHorizontalDistanceToLocation(client.player, foundX, foundZ);
         return new Text[] {
-            Text.translatable("string.explorerscompass.distance").append(": ").append(Text.literal(Integer.toString(distance)).formatted(Formatting.GRAY)),
-            Text.translatable("string.explorerscompass.coordinates").append(":"),
+            Text.literal("Distance").append(": ").append(Text.literal(Integer.toString(distance)).formatted(Formatting.GRAY)),
+            Text.literal("Coordinates").append(":"),
             Text.literal(foundX + ", " + foundZ).formatted(Formatting.GRAY)
         };
     }
@@ -1399,9 +1412,9 @@ public class ExplorersCompassScreen extends Screen {
         context.drawText(textRenderer, "?", iconX - textRenderer.getWidth("?") / 2 + 1, iconY - textRenderer.fontHeight / 2 + 1, color, false);
     }
 
-    private void drawQuestionTooltip(DrawContext context, String key, int mouseX, int mouseY) {
+    private void drawQuestionTooltip(DrawContext context, String message, int mouseX, int mouseY) {
         List<Text> lines = new ArrayList<>();
-        for (OrderedText line : textRenderer.wrapLines(Text.translatable(key), Math.min(220, width - 30))) {
+        for (OrderedText line : textRenderer.wrapLines(Text.literal(message), Math.min(220, width - 30))) {
             StringBuilder content = new StringBuilder();
             line.accept((index, style, codePoint) -> { content.appendCodePoint(codePoint); return true; });
             lines.add(Text.literal(content.toString()));
@@ -1433,16 +1446,16 @@ public class ExplorersCompassScreen extends Screen {
             int frame = (int)((System.currentTimeMillis() - dialogStarted) / 31L % 32L);
             Identifier texture = new Identifier(ExplorersCompass.MODID, String.format(Locale.ROOT, "textures/item/explorerscompass_%02d.png", frame));
             context.drawTexture(texture, x + (w - 16) / 2, y + 10, 16, 16, 0, 0, 16, 16, 16, 16);
-            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("string.explorerscompass.searchingDialog"), x + w / 2, y + 32, 0xffffff);
+            context.drawCenteredTextWithShadow(textRenderer, Text.literal("Locating..."), x + w / 2, y + 32, 0xffffff);
             if (searchedListed) {
-                context.drawCenteredTextWithShadow(textRenderer, Text.translatable("string.explorerscompass.structuresSelected", listedSelectedCount), x + w / 2, y + 47, 0xffffff);
+                context.drawCenteredTextWithShadow(textRenderer, Text.literal(listedSelectedCount + " structures selected"), x + w / 2, y + 47, 0xffffff);
                 if (listedSkippedCount > 0) context.drawCenteredTextWithShadow(textRenderer, wrongDimensionCountText(), x + w / 2, y + 59, 0xffffff);
             }
             ItemStack heldCompass = client.player == null ? ItemStack.EMPTY : ItemUtils.getHeldItem(client.player, ExplorersCompass.EXPLORERS_COMPASS_ITEM);
             int distance = heldCompass.getItem() instanceof ExplorersCompassItem
                 ? ((ExplorersCompassItem) heldCompass.getItem()).getSearchRadius(heldCompass) : 0;
-            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("string.explorerscompass.distance").getString() + ": " + distance, x + w / 2, y + (searchedListed ? (listedSkippedCount > 0 ? 74 : 59) : 47), 0xffffff);
-            drawDialogButton(context, Text.translatable("string.explorerscompass.back").getString(), x + (w - 70) / 2, y + searchingBackY(), 70, mouseX, mouseY);
+            context.drawCenteredTextWithShadow(textRenderer, Text.literal("Distance").getString() + ": " + distance, x + w / 2, y + (searchedListed ? (listedSkippedCount > 0 ? 74 : 59) : 47), 0xffffff);
+            drawDialogButton(context, Text.literal("Back").getString(), x + (w - 70) / 2, y + searchingBackY(), 70, mouseX, mouseY);
         } else if (dialog == Dialog.FOUND) {
             double yaw = client.player == null ? 0.0D : client.player.getYaw() % 360.0D;
             double targetAngle = client.player == null ? 0.0D : Math.atan2(foundZ - client.player.getZ(), foundX - client.player.getX());
@@ -1450,7 +1463,7 @@ public class ExplorersCompassScreen extends Screen {
             int frame = (16 + (int)Math.floor(angle * 32.0D + 0.5D)) % 32;
             Identifier texture = new Identifier(ExplorersCompass.MODID, String.format(Locale.ROOT, "textures/item/explorerscompass_%02d.png", frame));
             context.drawTexture(texture, x + (w - 16) / 2, y + 10, 16, 16, 0, 0, 16, 16, 16, 16);
-            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("string.explorerscompass.structureFound"), x + w / 2, y + 32, 0xffffff);
+            context.drawCenteredTextWithShadow(textRenderer, Text.literal("Structure Located"), x + w / 2, y + 32, 0xffffff);
             Text[] lines = foundInfoLines();
             Text[] locationLines = showFoundCoordinates ? foundLocationLines() : new Text[0];
             int leftWidth = w - 24;
@@ -1471,14 +1484,14 @@ public class ExplorersCompassScreen extends Screen {
                 context.drawTextWithShadow(textRenderer, Language.getInstance().reorder(textRenderer.trimToWidth(locationLines[i], rightWidth)), rightX, y + 50 + i * 12, 0xffffff);
             }
             if (ExplorersCompass.canTeleport) {
-                drawDialogButton(context, Text.translatable("string.explorerscompass.teleport").getString(), x + (w - 100) / 2, y + 94, 100, mouseX, mouseY);
+                drawDialogButton(context, Text.literal("Teleport").getString(), x + (w - 100) / 2, y + 94, 100, mouseX, mouseY);
             }
-            drawDialogButton(context, Text.translatable("string.explorerscompass.back").getString(), x + (w - 70) / 2, y + (ExplorersCompass.canTeleport ? 117 : 94), 70, mouseX, mouseY);
+            drawDialogButton(context, Text.literal("Back").getString(), x + (w - 70) / 2, y + (ExplorersCompass.canTeleport ? 117 : 94), 70, mouseX, mouseY);
         } else if (dialog == Dialog.INSUFFICIENT_XP) {
-            context.drawCenteredTextWithShadow(textRenderer, Text.translatable("string.explorerscompass.insufficientXp"), x + w / 2, y + 6, 0xffff4444);
+            context.drawCenteredTextWithShadow(textRenderer, Text.literal("You don't have enough levels, buddy!"), x + w / 2, y + 6, 0xffff4444);
             int lineX = x + (w - xpCostLineWidth()) / 2;
             int lineY = y + 10 + textRenderer.fontHeight;
-            Text costLabel = Text.translatable("string.explorerscompass.xpCost");
+            Text costLabel = Text.literal("XP Cost:");
             context.drawTextWithShadow(textRenderer, costLabel, lineX, lineY, 0xffffff);
             int orbX = lineX + textRenderer.getWidth(costLabel) + 3;
             int orbSize = 5;
@@ -1487,9 +1500,9 @@ public class ExplorersCompassScreen extends Screen {
             context.drawTexture(orbTexture, orbX, lineY + (textRenderer.fontHeight - orbSize) / 2, orbSize, orbSize, 0, 0, 16, 16, 16, 16);
             context.drawTextWithShadow(textRenderer, Integer.toString(insufficientXpCost), orbX + orbSize + 3, lineY, 0x80ff20);
         } else {
-            Text message = dialog == Dialog.WRONG_DIMENSION ? Text.translatable("string.explorerscompass.wrongDimension")
-                : dialog == Dialog.NOT_FOUND ? Text.translatable("string.explorerscompass.notFoundWithin", failedRadius)
-                : Text.translatable("string.explorerscompass.searchRejected");
+            Text message = dialog == Dialog.WRONG_DIMENSION ? Text.literal("You're in the wrong dimension, buddy!")
+                : dialog == Dialog.NOT_FOUND ? Text.literal("Couldn't locate structure within " + failedRadius + " blocks")
+                : Text.literal("Search could not start");
             if (dialog == Dialog.NOT_FOUND) {
                 long now = System.nanoTime();
                 long elapsed = now - notFoundCompassUpdated;
@@ -1509,19 +1522,19 @@ public class ExplorersCompassScreen extends Screen {
             context.drawCenteredTextWithShadow(textRenderer, textRenderer.trimToWidth(message.getString(), w - 12), x + w / 2, dialog == Dialog.WRONG_DIMENSION ? y + (h - textRenderer.fontHeight) / 2 : dialog == Dialog.NOT_FOUND ? y + 32 : y + 14, dialog == Dialog.WRONG_DIMENSION ? 0xffff4444 : 0xffffff);
             if (dialog == Dialog.NOT_FOUND) {
                 if (searchedListed) {
-                    context.drawCenteredTextWithShadow(textRenderer, Text.translatable("string.explorerscompass.structuresSelected", listedSelectedCount), x + w / 2, y + 47, 0xffffff);
+                    context.drawCenteredTextWithShadow(textRenderer, Text.literal(listedSelectedCount + " structures selected"), x + w / 2, y + 47, 0xffffff);
                     if (listedSkippedCount > 0) context.drawCenteredTextWithShadow(textRenderer, wrongDimensionCountText(), x + w / 2, y + 59, 0xffffff);
                 }
                 int hideX = notFoundHideX();
                 int iconX = hideX + HIDE_BUTTON_WIDTH - 12;
                 int iconY = y + notFoundHideY() + 10;
-                drawDialogButton(context, Text.translatable("string.explorerscompass.keepSearching").getString(), notFoundKeepX(), y + notFoundHideY(), KEEP_SEARCHING_BUTTON_WIDTH, mouseX, mouseY, failedCanContinue);
-                drawDialogButton(context, Text.translatable(searchedListed ? "string.explorerscompass.hideAll" : "string.explorerscompass.hide").getString(), hideX, y + notFoundHideY(), HIDE_BUTTON_WIDTH, mouseX, mouseY);
+                drawDialogButton(context, Text.literal("Keep Searching").getString(), notFoundKeepX(), y + notFoundHideY(), KEEP_SEARCHING_BUTTON_WIDTH, mouseX, mouseY, failedCanContinue);
+                drawDialogButton(context, Text.literal(searchedListed ? "Hide All" : "Hide").getString(), hideX, y + notFoundHideY(), HIDE_BUTTON_WIDTH, mouseX, mouseY);
                 drawQuestionIcon(context, iconX, iconY);
-                if (insideQuestionIcon(mouseX, mouseY, iconX, iconY)) drawQuestionTooltip(context, searchedListed ? "string.explorerscompass.hideAll.tooltip" : "string.explorerscompass.hide.tooltip", mouseX, mouseY);
+                if (insideQuestionIcon(mouseX, mouseY, iconX, iconY)) drawQuestionTooltip(context, searchedListed ? "Removes all searched structures from the list on this client, across all worlds and servers. You can undo this in Settings." : "Removes the structure from the list on this client, across all worlds and servers. You can undo this in Settings.", mouseX, mouseY);
             }
             if (dialog == Dialog.NOT_FOUND || dialog == Dialog.REJECTED) {
-                drawDialogButton(context, Text.translatable("string.explorerscompass.back").getString(), x + (w - 70) / 2, y + (dialog == Dialog.NOT_FOUND ? notFoundBackY() : 57), 70, mouseX, mouseY);
+                drawDialogButton(context, Text.literal("Back").getString(), x + (w - 70) / 2, y + (dialog == Dialog.NOT_FOUND ? notFoundBackY() : 57), 70, mouseX, mouseY);
             }
         }
         context.getMatrices().pop();
@@ -1539,8 +1552,8 @@ public class ExplorersCompassScreen extends Screen {
         hiddenScroll = MathHelper.clamp(hiddenScroll, 0, Math.max(0, ids.size() - hiddenVisibleRows()));
         context.enableScissor(filterLeft(), filterTop(), filterRight(), filterBottom());
         if (ids.isEmpty()) context.drawCenteredTextWithShadow(textRenderer,
-                Text.translatable(ExplorersCompassConfig.hiddenStructures.isEmpty()
-                        ? "string.explorerscompass.noHiddenStructures" : "string.explorerscompass.noMatchingHiddenStructures"),
+                Text.literal(ExplorersCompassConfig.hiddenStructures.isEmpty()
+                        ? "No hidden structures" : "No matching hidden structures"),
                 width / 2, filterTop() + 20, 0xffffff);
         for (int row = 0; row < hiddenVisibleRows() && hiddenScroll + row < ids.size(); row++) {
             int y = filterTop() + 6 + row * 25;
@@ -1548,7 +1561,7 @@ public class ExplorersCompassScreen extends Screen {
             Identifier id = Identifier.tryParse(raw);
             String label = id == null || !allowedStructureIDs.contains(id) ? raw : StructureUtils.getStructureName(id) + " (" + raw + ")";
             context.drawTextWithShadow(textRenderer, textRenderer.trimToWidth(label, Math.max(1, width - 145)), 16, y + 6, 0xffffff);
-            drawDialogButton(context, Text.translatable("string.explorerscompass.remove").getString(), width - 95, y, 78, mouseX, mouseY);
+            drawDialogButton(context, Text.literal("Remove").getString(), width - 95, y, 78, mouseX, mouseY);
         }
         context.disableScissor();
         scrollbarFor(ScrollPanel.HIDDEN).render(context);
@@ -1571,8 +1584,8 @@ public class ExplorersCompassScreen extends Screen {
 	}
 
 	public int rowActionButtonWidth() {
-		return Math.max(textRenderer.getWidth(Text.translatable("string.explorerscompass.hide")),
-				textRenderer.getWidth(Text.translatable("string.explorerscompass.undo"))) + 4;
+		return Math.max(textRenderer.getWidth(Text.literal("Hide")),
+				textRenderer.getWidth(Text.literal("Undo"))) + 4;
 	}
 
 	public void toggleStructureHidden(Identifier id) {
@@ -1617,7 +1630,7 @@ public class ExplorersCompassScreen extends Screen {
 
 	public List<Identifier> sortStructures() {
 		final List<Identifier> structures = new ArrayList<Identifier>(structureIDsMatchingSearch);
-		Collator collator = languageCollator();
+		Collator collator = englishCollator();
 		structures.sort((first, second) -> {
 			for (SortCriterion criterion : sortOrder) {
 				int comparison = criterion.compare(first, second, collator);
@@ -1630,37 +1643,36 @@ public class ExplorersCompassScreen extends Screen {
 		return structures;
 	}
 
-	private Collator languageCollator() {
-		String language = client.getLanguageManager().getLanguage();
-		return Collator.getInstance(Locale.forLanguageTag(language.replace('_', '-')));
+	private Collator englishCollator() {
+		return Collator.getInstance(Locale.US);
 	}
 
 	private void setupButtons() {
-		searchButton = addDrawableChild(new TransparentButton(10, 40, 110, 20, Text.translatable("string.explorerscompass.search"), (onPress) -> {
+		searchButton = addDrawableChild(new TransparentButton(10, 40, 110, 20, Text.literal("Search"), (onPress) -> {
 			if (selectionList.hasSelection()) {
 				selectionList.getSelectedOrNull().searchForStructure();
 			}
 		}));
 		searchButton.active = false;
 
-		searchListedButton = addDrawableChild(new TransparentButton(10, 65, 110, 20, Text.translatable("string.explorerscompass.searchListed"), (onPress) -> searchListed()));
+		searchListedButton = addDrawableChild(new TransparentButton(10, 65, 110, 20, Text.literal("Search Listed"), (onPress) -> searchListed()));
 		searchListedButton.active = false;
 
-		sortOrderButton = addDrawableChild(new TransparentButton(10, 90, 110, 20, Text.translatable("string.explorerscompass.sortOrder"), (onPress) -> {
+		sortOrderButton = addDrawableChild(new TransparentButton(10, 90, 110, 20, Text.literal("Sort Priority"), (onPress) -> {
 			if (sortMenuOpen) {
 				closeSortMenu();
 			} else {
 				sortMenuOpen = true;
 			}
 		}));
-		filtersButton = addDrawableChild(new TransparentButton(10, sortOrderButton.getY() + 25, 85, 20, Text.translatable("string.explorerscompass.filters"), (onPress) -> {
+		filtersButton = addDrawableChild(new TransparentButton(10, sortOrderButton.getY() + 25, 85, 20, Text.literal("Filters"), (onPress) -> {
 			setFiltersOpen(!filtersOpen);
 		}));
 		clearFiltersButton = addDrawableChild(new TransparentButton(100, sortOrderButton.getY() + 25, 20, 20, Text.literal(""), (onPress) -> {
 			FilterSelections.clear();
 			processSearchTerm();
 		}));
-		settingsButton = addDrawableChild(new TransparentButton(10, height - 30, 110, 20, Text.translatable("string.explorerscompass.settings"), (onPress) -> {
+		settingsButton = addDrawableChild(new TransparentButton(10, height - 30, 110, 20, Text.literal("Settings"), (onPress) -> {
 			setSettingsOpen(true);
 		}));
 		int controlX = settingsControlX();
@@ -1708,13 +1720,6 @@ public class ExplorersCompassScreen extends Screen {
 			updateSettingsButtonLabels();
 			processSearchTerm();
 		}));
-		translateNamesButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(9), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), (onPress) -> {
-			ExplorersCompassConfig.translateStructureNames = !ExplorersCompassConfig.translateStructureNames;
-			ExplorersCompassConfig.saveClient();
-			updateSettingsButtonLabels();
-			rebuildFilterOptions();
-			processSearchTerm();
-		}));
 		adjustRowsToFitViewButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(5), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), (onPress) -> {
 			Identifier selectedId = selectionList.hasSelection() ? selectionList.getSelectedOrNull().getStructureID() : null;
 			ExplorersCompassConfig.adjustRowsToFitView = !ExplorersCompassConfig.adjustRowsToFitView;
@@ -1729,13 +1734,13 @@ public class ExplorersCompassScreen extends Screen {
 			ExplorersCompassConfig.saveClient();
 			updateSettingsButtonLabels();
 		}));
-		pauseGameWhenOpenButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(10), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), button -> {
+		pauseGameWhenOpenButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(9), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), button -> {
 			ExplorersCompassConfig.pauseGameWhenOpen = !ExplorersCompassConfig.pauseGameWhenOpen;
 			ExplorersCompassConfig.saveClient();
 			updateSettingsButtonLabels();
 		}));
 		updateSettingsButtonLabels();
-        hiddenStructuresButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(11), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.translatable("string.explorerscompass.open"), button -> {
+        hiddenStructuresButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(10), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.literal("Open"), button -> {
             settingsOpen = false;
             hiddenStructuresOpen = true;
             hiddenScroll = 0;
@@ -1747,19 +1752,19 @@ public class ExplorersCompassScreen extends Screen {
 			client.setScreen(null);
 		}));
 
-		teleportButton = addDrawableChild(new TransparentButton(10, 10, 110, 20, Text.translatable("string.explorerscompass.teleport"), (onPress) -> {
+		teleportButton = addDrawableChild(new TransparentButton(10, 10, 110, 20, Text.literal("Teleport"), (onPress) -> {
 			teleport();
 		}));
 		teleportButton.active = false;
-		clearFiltersTopButton = addDrawableChild(new TransparentButton(10, 10, width >= 500 ? 110 : 85, 20, Text.translatable("string.explorerscompass.clearFilters"), (onPress) -> {
+		clearFiltersTopButton = addDrawableChild(new TransparentButton(10, 10, width >= 500 ? 110 : 85, 20, Text.literal("Clear Filters"), (onPress) -> {
 			FilterSelections.clear();
 			processSearchTerm();
 			filterScroll = MathHelper.clamp(filterScroll, 0, filterMaxScroll());
 		}));
-		excludeVisitedButton = addDrawableChild(new TransparentButton(10, 37, 150, 20, Text.translatable("string.explorerscompass.excludeVisited"), button -> {
+		excludeVisitedButton = addDrawableChild(new TransparentButton(10, 37, 150, 20, Text.literal("Exclude visited"), button -> {
 			FilterSelections.toggleExcludeVisited();
 		}));
-		backButton = addDrawableChild(new TransparentButton(10, 10, width >= 500 ? 110 : 50, 20, Text.translatable("string.explorerscompass.back"), (onPress) -> {
+		backButton = addDrawableChild(new TransparentButton(10, 10, width >= 500 ? 110 : 50, 20, Text.literal("Back"), (onPress) -> {
             if (hiddenStructuresOpen) {
                 leaveHiddenStructures();
             } else if (settingsOpen) {
@@ -1776,24 +1781,24 @@ public class ExplorersCompassScreen extends Screen {
 		int searchX = selectionList.getRowLeft();
 		int rightButtonX = teleportButton.getY() == 10 ? teleportButton.getX() : cancelButton.getX();
 		int availableWidth = Math.max(0, rightButtonX - searchX - SEARCH_TELEPORT_GAP);
-		searchTextField = new TransparentTextField(textRenderer, searchX, 10, Math.min(SEARCH_FIELD_WIDTH, availableWidth), 20, Text.translatable("string.explorerscompass.search"));
+		searchTextField = new TransparentTextField(textRenderer, searchX, 10, Math.min(SEARCH_FIELD_WIDTH, availableWidth), 20, Text.literal("Search"));
 		searchTextField.setText(sessionSearchText);
 		searchTextField.setChangedListener(value -> processSearchTerm());
 		addDrawableChild(searchTextField);
 		searchTextField.setVisible(isStructureView());
-		int filterSearchX = 20 + textRenderer.getWidth(Text.translatable("string.explorerscompass.filters"));
-		filterSearchTextField = new TransparentTextField(textRenderer, filterSearchX, 10, Math.max(1, Math.min(SEARCH_FIELD_WIDTH, clearFiltersTopButton.getX() - filterSearchX - SEARCH_TELEPORT_GAP)), 20, Text.translatable("string.explorerscompass.searchFilters"));
+		int filterSearchX = 20 + textRenderer.getWidth(Text.literal("Filters"));
+		filterSearchTextField = new TransparentTextField(textRenderer, filterSearchX, 10, Math.max(1, Math.min(SEARCH_FIELD_WIDTH, clearFiltersTopButton.getX() - filterSearchX - SEARCH_TELEPORT_GAP)), 20, Text.literal("Search Filters"));
 		filterSearchTextField.setChangedListener(value -> {
 			filterScroll = 0;
 		});
 		addDrawableChild(filterSearchTextField);
 		filterSearchTextField.setVisible(filtersOpen);
 		int headerEnd = backButton.getX() - SEARCH_TELEPORT_GAP;
-		int hiddenSearchX = Math.min(10 + textRenderer.getWidth(Text.translatable("string.explorerscompass.hiddenBreadcrumb")) + 10,
+		int hiddenSearchX = Math.min(10 + textRenderer.getWidth(Text.literal("Settings > Hidden Structures")) + 10,
 				Math.max(10, headerEnd - 80));
 		hiddenSearchTextField = new TransparentTextField(textRenderer, hiddenSearchX, 10,
 				Math.max(1, Math.min(SEARCH_FIELD_WIDTH, headerEnd - hiddenSearchX)),
-				20, Text.translatable("string.explorerscompass.searchHiddenStructures"));
+				20, Text.literal("Search hidden structures"));
 		hiddenSearchTextField.setMaxLength(256);
 		hiddenSearchTextField.setText(hiddenSearchText);
 		hiddenSearchTextField.setChangedListener(value -> {
@@ -1825,7 +1830,7 @@ public class ExplorersCompassScreen extends Screen {
 		cancelButton.setX(width - 30);
 		settingsButton.setY(height - 30);
         hiddenStructuresButton.setX(settingsControlX());
-        hiddenStructuresButton.setY(settingsRowY(11));
+        hiddenStructuresButton.setY(settingsRowY(10));
 		if (width >= 480) {
 			teleportButton.setX(cancelButton.getX() - teleportButton.getWidth() - 5);
 			teleportButton.setY(10);
@@ -1849,7 +1854,6 @@ public class ExplorersCompassScreen extends Screen {
 		closeOnFoundButton.visible = settingsOpen;
 		chatOverlayButton.visible = settingsOpen;
 		showTechnicalNamesButton.visible = settingsOpen;
-		translateNamesButton.visible = settingsOpen;
 		offsetDecreaseButton.visible = settingsOpen;
 		offsetIncreaseButton.visible = settingsOpen;
 		overlaySideButton.visible = settingsOpen;
@@ -1872,9 +1876,8 @@ public class ExplorersCompassScreen extends Screen {
 		placeSetting(closeOnFoundButton, 6);
 		placeSetting(chatOverlayButton, 7);
 		placeSetting(showTechnicalNamesButton, 8);
-		placeSetting(translateNamesButton, 9);
-		placeSetting(pauseGameWhenOpenButton, 10);
-		placeSetting(hiddenStructuresButton, 11);
+		placeSetting(pauseGameWhenOpenButton, 9);
+		placeSetting(hiddenStructuresButton, 10);
 	}
 
 	private void placeSetting(ButtonWidget button, int row) {
