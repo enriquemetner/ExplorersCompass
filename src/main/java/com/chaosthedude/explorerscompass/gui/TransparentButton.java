@@ -9,9 +9,14 @@ import net.minecraft.text.Text;
 
 @Environment(EnvType.CLIENT)
 public class TransparentButton extends ButtonWidget {
+	private int rightInset;
 
 	public TransparentButton(int x, int y, int width, int height, Text label, PressAction onPress) {
 		super(x, y, width, height, label, onPress, DEFAULT_NARRATION_SUPPLIER);
+	}
+
+	public void setRightInset(int rightInset) {
+		this.rightInset = rightInset;
 	}
 
 	@Override
@@ -29,11 +34,11 @@ public class TransparentButton extends ButtonWidget {
 
 			context.fill(getX(), getY(), getX() + getWidth(), getY() + getHeight(), color / 2 << 24);
 			String label = getMessage().getString();
-			int availableWidth = getWidth() - 8;
+			int availableWidth = Math.max(1, getWidth() - rightInset - 8);
 			if (mc.textRenderer.getWidth(label) > availableWidth) {
-				label = mc.textRenderer.trimToWidth(label, availableWidth - mc.textRenderer.getWidth("...")) + "...";
+				label = mc.textRenderer.trimToWidth(label, Math.max(1, availableWidth - mc.textRenderer.getWidth("..."))) + "...";
 			}
-			context.drawCenteredTextWithShadow(mc.textRenderer, label, getX() + getWidth() / 2, getY() + (getHeight() - 8) / 2, 0xffffff);
+			context.drawCenteredTextWithShadow(mc.textRenderer, label, getX() + (getWidth() - rightInset) / 2, getY() + (getHeight() - 8) / 2, 0xffffff);
 		}
 	}
 
