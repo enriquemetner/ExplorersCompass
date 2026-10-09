@@ -48,8 +48,9 @@ import net.minecraft.world.World;
 
 @Environment(EnvType.CLIENT)
 public class ExplorersCompassScreen extends Screen {
-	private static final int SORT_MENU_WIDTH = 110;
 	private static final int SORT_ROW_HEIGHT = 20;
+	private static final int SORT_LABEL_GAP = 11;
+	private static final int SORT_HIGHLIGHT_PADDING = 4;
 	private static final int SEARCH_FIELD_WIDTH = 210;
 	private static final int SEARCH_TELEPORT_GAP = 10;
 	private static final int PREFERRED_FILTER_ROW_HEIGHT = 20;
@@ -249,9 +250,7 @@ public class ExplorersCompassScreen extends Screen {
 			}
 			return super.mouseScrolled(scroll1, scroll2, scroll3);
 		}
-		if (sortMenuOpen && sortRowAt(scroll1, scroll2) >= 0) {
-			return true;
-		}
+		if (sortMenuOpen) return true;
 		return selectionList.mouseScrolled(scroll1, scroll2, scroll3);
 	}
 
@@ -342,12 +341,6 @@ public class ExplorersCompassScreen extends Screen {
 		if (filtersOpen) {
 			renderFilterTooltip(context, mouseX, mouseY);
 		}
-		if (sortMenuOpen) {
-			context.getMatrices().push();
-			context.getMatrices().translate(0, 0, 200);
-			renderSortMenu(context, mouseX, mouseY);
-			context.getMatrices().pop();
-		}
 		if (filtersOpen) {
 			context.drawTextWithShadow(textRenderer, Text.literal("Filters"), 10, 15, 0xffffff);
         } else if (hiddenStructuresOpen) {
@@ -365,25 +358,37 @@ public class ExplorersCompassScreen extends Screen {
 		if (isStructureView() && dialog == Dialog.NONE && entryFiltersId == null && !sortMenuOpen && selectionList.isHideButtonHovered(mouseX, mouseY)) {
 			drawQuestionTooltip(context, "Removes the structure from the list on this client, across all worlds and servers. You can undo this in Settings.", mouseX, mouseY);
 		}
+		if (sortMenuOpen) renderSortMenu(context, mouseX, mouseY);
 		if (entryFiltersId != null) renderEntryFilters(context, mouseX, mouseY);
         if (dialog != Dialog.NONE) renderSearchDialog(context, mouseX, mouseY);
 	}
 
 	private int sortMenuWidth() {
-		int desiredWidth = SORT_MENU_WIDTH;
-		for (int i = 0; i < sortOrder.size(); i++) {
-			desiredWidth = Math.max(desiredWidth, textRenderer.getWidth((i + 1) + ". " + sortOrder.get(i).getLabel().getString()) + 28);
-		}
-		return Math.min(desiredWidth, Math.max(SORT_MENU_WIDTH, width - sortOrderButton.getX() - sortOrderButton.getWidth() - 10));
+		return Math.max(40, Math.min(LockedRequirementsView.WINDOW_WIDTH, width - 24));
 	}
 
 	private int sortMenuX() {
-		return MathHelper.clamp(sortOrderButton.getX() + sortOrderButton.getWidth() + 5, 0, Math.max(0, width - sortMenuWidth() - 5));
+		return (width - sortMenuWidth()) / 2;
 	}
 
 	private int sortMenuY() {
-		return sortOrderButton.getY();
+		return (height - sortMenuHeight()) / 2;
 	}
+
+	private int sortMenuHeight() { return 65 + sortOrder.size() * SORT_ROW_HEIGHT; }
+	private int sortRowsY() { return sortMenuY() + 30; }
+	private int sortBackY() { return sortRowsY() + sortOrder.size() * SORT_ROW_HEIGHT + 10; }
+	private int sortLabelWidth() {
+		int width = 0;
+		for (SortCriterion criterion : sortOrder) width = Math.max(width, textRenderer.getWidth(criterion.getLabel()));
+		return width;
+	}
+	private int sortNumberRightX() { return sortMenuX() + sortMenuWidth() / 2 - sortLabelWidth() / 2 - SORT_LABEL_GAP; }
+	private int sortArrowsX() { return sortMenuX() + sortMenuWidth() / 2 + (sortLabelWidth() + 1) / 2 + SORT_LABEL_GAP; }
+	private int sortContentLeft() {
+		return sortNumberRightX() - textRenderer.getWidth(sortOrder.size() + ".") - SORT_HIGHLIGHT_PADDING;
+	}
+	private int sortContentRight() { return sortArrowsX() + 5 + SORT_HIGHLIGHT_PADDING; }
 
 	private void closeSortMenu() {
 		commitSortOrder();
@@ -401,9 +406,8 @@ public class ExplorersCompassScreen extends Screen {
 	}
 
 	private int sortRowAt(double mouseX, double mouseY) {
-		int x = sortMenuX();
-		int y = sortMenuY();
-		if (mouseX < x || mouseX >= x + sortMenuWidth() || mouseY < y || mouseY >= y + sortOrder.size() * SORT_ROW_HEIGHT) {
+		int y = sortRowsY();
+		if (mouseX < sortContentLeft() || mouseX >= sortContentRight() || mouseY < y || mouseY >= y + sortOrder.size() * SORT_ROW_HEIGHT) {
 			return -1;
 		}
 		return (int) (mouseY - y) / SORT_ROW_HEIGHT;
@@ -413,18 +417,32 @@ public class ExplorersCompassScreen extends Screen {
 		int x = sortMenuX();
 		int y = sortMenuY();
 		int menuWidth = sortMenuWidth();
-		context.fill(x - 1, y - 1, x + menuWidth + 1, y + sortOrder.size() * SORT_ROW_HEIGHT + 1, 0xff909090);
-		context.fill(x, y, x + menuWidth, y + sortOrder.size() * SORT_ROW_HEIGHT, 0xff000000);
+		context.getMatrices().push();
+		context.getMatrices().translate(0, 0, 300);
+		context.fill(0, 0, width, height, 0x88000000);
+		context.fill(x - 1, y - 1, x + menuWidth + 1, y + sortMenuHeight() + 1, 0xff909090);
+		context.fill(x, y, x + menuWidth, y + sortMenuHeight(), 0xff000000);
+		context.drawCenteredTextWithShadow(textRenderer, Text.literal("Sort Priority"), x + menuWidth / 2, y + 10, 0xffffff);
 		int hoveredRow = sortRowAt(mouseX, mouseY);
+		int centerX = x + menuWidth / 2;
+		int numberRightX = sortNumberRightX();
+		int arrowsX = sortArrowsX();
 		for (int i = 0; i < sortOrder.size(); i++) {
-			int rowY = y + i * SORT_ROW_HEIGHT;
-			int background = i == draggedSortRow || i == hoveredRow ? 0xff000000 : 0xff242424;
-			int rowBottom = rowY + SORT_ROW_HEIGHT - (i == sortOrder.size() - 1 ? 1 : 0);
-			context.fill(x + 1, rowY + 1, x + menuWidth - 1, rowBottom, background);
-			String label = (i + 1) + ". " + sortOrder.get(i).getLabel().getString();
-			context.drawTextWithShadow(textRenderer, textRenderer.trimToWidth(label, menuWidth - 28), x + 5, rowY + 6, 0xffffff);
-			renderSortArrows(context, x + menuWidth - 11, rowY + 6);
+			int rowY = sortRowsY() + i * SORT_ROW_HEIGHT;
+			if (i == draggedSortRow || i == hoveredRow)
+				context.fill(sortContentLeft(), rowY, sortContentRight(), rowY + SORT_ROW_HEIGHT, 0xff242424);
+			String number = (i + 1) + ".";
+			context.drawTextWithShadow(textRenderer, number, numberRightX - textRenderer.getWidth(number), rowY + 6, 0xffaaaaaa);
+			context.drawCenteredTextWithShadow(textRenderer, sortOrder.get(i).getLabel(), centerX, rowY + 6, 0xffffff);
+			renderSortArrows(context, arrowsX, rowY + 6);
 		}
+		int backX = x + (menuWidth - 70) / 2;
+		int backY = sortBackY();
+		boolean backHovered = mouseX >= backX && mouseX < backX + 70 && mouseY >= backY && mouseY < backY + 20;
+		context.fill(backX, backY, backX + 70, backY + 20, 0xff909090);
+		context.fill(backX + 1, backY + 1, backX + 69, backY + 19, backHovered ? 0xff424242 : 0xff242424);
+		context.drawCenteredTextWithShadow(textRenderer, Text.literal("Back"), x + menuWidth / 2, backY + 6, 0xffffff);
+		context.getMatrices().pop();
 	}
 
 	private void renderSortArrows(DrawContext context, int x, int y) {
@@ -999,12 +1017,13 @@ public class ExplorersCompassScreen extends Screen {
 		} finally {
 			// Minecraft routes drag events to the focused child. Keep the list focused
 			// after grabbing its scrollbar instead of returning focus to search.
-			if (client.currentScreen == this && dialog == Dialog.NONE && entryFiltersId == null && !draggingStructureScrollbar) focusActiveSearchField();
+			if (client.currentScreen == this && dialog == Dialog.NONE && entryFiltersId == null && !sortMenuOpen && !draggingStructureScrollbar) focusActiveSearchField();
 		}
 	}
 
 	private boolean handleMouseClicked(double mouseX, double mouseY, int button) {
 		if (entryFiltersId != null) return clickEntryFilters(mouseX, mouseY, button);
+		if (sortMenuOpen) return clickSortMenu(mouseX, mouseY, button);
         if (dialog == Dialog.LOCKED) {
             if (lockedRequirementsView.click(mouseX, mouseY, button, width, height)) dismissDialog();
             return true;
@@ -1065,21 +1084,24 @@ public class ExplorersCompassScreen extends Screen {
 				return true;
 			}
 		}
-		if (sortMenuOpen) {
-			int row = sortRowAt(mouseX, mouseY);
-			if (row >= 0) {
-				if (button == 0) {
-					draggedSortRow = row;
-				}
-				return true;
-			}
-			if (mouseX < sortOrderButton.getX() || mouseX >= sortOrderButton.getX() + sortOrderButton.getWidth()
-					|| mouseY < sortOrderButton.getY() || mouseY >= sortOrderButton.getY() + sortOrderButton.getHeight()) {
-				closeSortMenu();
-				return true;
-			}
-		}
 		return super.mouseClicked(mouseX, mouseY, button);
+	}
+
+	private boolean clickSortMenu(double mouseX, double mouseY, int button) {
+		int x = sortMenuX(), y = sortMenuY(), w = sortMenuWidth();
+		if (mouseX < x - 1 || mouseX >= x + w + 1 || mouseY < y - 1 || mouseY >= y + sortMenuHeight() + 1) {
+			closeSortMenu();
+			return true;
+		}
+		if (button != 0) return true;
+		int backX = x + (w - 70) / 2;
+		if (mouseX >= backX && mouseX < backX + 70 && mouseY >= sortBackY() && mouseY < sortBackY() + 20) {
+			closeSortMenu();
+			return true;
+		}
+		int row = sortRowAt(mouseX, mouseY);
+		if (row >= 0) draggedSortRow = row;
+		return true;
 	}
 
 	private TransparentTextField searchFieldAt(double mouseX, double mouseY) {
@@ -1119,7 +1141,7 @@ public class ExplorersCompassScreen extends Screen {
 		}
 		if (draggedSortRow >= 0 && button == 0) {
 			if (mouseX >= sortMenuX() && mouseX < sortMenuX() + sortMenuWidth()) {
-				int targetRow = MathHelper.clamp((int) Math.floor((mouseY - sortMenuY()) / SORT_ROW_HEIGHT), 0, sortOrder.size() - 1);
+				int targetRow = MathHelper.clamp((int) Math.floor((mouseY - sortRowsY()) / SORT_ROW_HEIGHT), 0, sortOrder.size() - 1);
 				if (targetRow != draggedSortRow) {
 					SortCriterion criterion = sortOrder.remove(draggedSortRow);
 					sortOrder.add(targetRow, criterion);
@@ -1129,6 +1151,7 @@ public class ExplorersCompassScreen extends Screen {
 			}
 			return true;
 		}
+		if (sortMenuOpen) return true;
 		return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
 	}
 
@@ -1151,6 +1174,7 @@ public class ExplorersCompassScreen extends Screen {
 			draggedSortRow = -1;
 			return true;
 		}
+		if (sortMenuOpen) return true;
 		return super.mouseReleased(mouseX, mouseY, button);
 	}
 
@@ -1158,6 +1182,10 @@ public class ExplorersCompassScreen extends Screen {
 	public boolean keyPressed(int par1, int par2, int par3) {
 		if (entryFiltersId != null) {
 			if (par1 == 256) entryFiltersId = null;
+			return true;
+		}
+		if (sortMenuOpen) {
+			if (par1 == 256) closeSortMenu();
 			return true;
 		}
         if (dialog != Dialog.NONE) {
@@ -1191,10 +1219,6 @@ public class ExplorersCompassScreen extends Screen {
 			setFiltersOpen(false);
 			return true;
 		}
-		if (sortMenuOpen && par1 == 256) {
-			closeSortMenu();
-			return true;
-		}
 		boolean ret = super.keyPressed(par1, par2, par3);
 		focusActiveSearchField();
 		return ret;
@@ -1202,7 +1226,7 @@ public class ExplorersCompassScreen extends Screen {
 
 	@Override
 	public boolean charTyped(char typedChar, int keyCode) {
-		if (dialog != Dialog.NONE || entryFiltersId != null) return true;
+		if (dialog != Dialog.NONE || entryFiltersId != null || sortMenuOpen) return true;
 		boolean ret = super.charTyped(typedChar, keyCode);
 		focusActiveSearchField();
 		return ret;
