@@ -4,10 +4,13 @@ import com.chaosthedude.explorerscompass.items.ExplorersCompassItem;
 import com.chaosthedude.explorerscompass.network.SyncPacket;
 import com.chaosthedude.explorerscompass.network.SearchResultPacket;
 import com.chaosthedude.explorerscompass.network.UnlockToastPacket;
+import com.chaosthedude.explorerscompass.network.RepairDurabilityPacket;
+import com.chaosthedude.explorerscompass.recipe.CompassRepairRecipe;
 import com.chaosthedude.explorerscompass.util.CompassState;
 
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.minecraft.client.item.ClampedModelPredicateProvider;
 import net.minecraft.client.item.ModelPredicateProviderRegistry;
 import net.minecraft.client.world.ClientWorld;
@@ -28,6 +31,8 @@ public class ExplorersCompassClient implements ClientModInitializer {
 		ClientPlayNetworking.registerGlobalReceiver(SyncPacket.ID, SyncPacket::apply);
 		ClientPlayNetworking.registerGlobalReceiver(SearchResultPacket.ID, SearchResultPacket::apply);
 		ClientPlayNetworking.registerGlobalReceiver(UnlockToastPacket.ID, UnlockToastPacket::apply);
+		ClientPlayNetworking.registerGlobalReceiver(RepairDurabilityPacket.ID, RepairDurabilityPacket::apply);
+		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> CompassRepairRecipe.clearServerDurability());
 		
 		ModelPredicateProviderRegistry.register(ExplorersCompass.EXPLORERS_COMPASS_ITEM, new Identifier("angle"), new ClampedModelPredicateProvider() {
 			private double rotation;

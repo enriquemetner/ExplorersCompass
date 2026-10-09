@@ -18,6 +18,8 @@ import com.chaosthedude.explorerscompass.network.ContinueSearchPacket;
 import com.chaosthedude.explorerscompass.network.ResetCompassPacket;
 import com.chaosthedude.explorerscompass.network.SyncPacket;
 import com.chaosthedude.explorerscompass.network.TeleportPacket;
+import com.chaosthedude.explorerscompass.network.RepairDurabilityPacket;
+import com.chaosthedude.explorerscompass.recipe.CompassRepairRecipe;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ListMultimap;
 
@@ -29,6 +31,8 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.item.ItemGroups;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.Registry;
+import net.minecraft.recipe.RecipeSerializer;
+import net.minecraft.recipe.SpecialRecipeSerializer;
 import net.minecraft.util.Identifier;
 
 public class ExplorersCompass implements ModInitializer {
@@ -38,6 +42,8 @@ public class ExplorersCompass implements ModInitializer {
 	public static final Logger LOGGER = LogManager.getLogger(MODID);
 
 	public static final ExplorersCompassItem EXPLORERS_COMPASS_ITEM = new ExplorersCompassItem();
+	public static final RecipeSerializer<CompassRepairRecipe> COMPASS_REPAIR_SERIALIZER =
+			new SpecialRecipeSerializer<>(CompassRepairRecipe::new);
 
 	public static Map<Identifier, com.chaosthedude.explorerscompass.unlocking.RequirementNode> lockedRequirements = Map.of();
 	public static boolean synced;
@@ -61,6 +67,7 @@ public class ExplorersCompass implements ModInitializer {
                 com.chaosthedude.explorerscompass.unlocking.UnlockingCommands.register(dispatcher));
 
 		Registry.register(Registries.ITEM, new Identifier(MODID, "explorerscompass"), EXPLORERS_COMPASS_ITEM);
+		Registry.register(Registries.RECIPE_SERIALIZER, new Identifier(MODID, "compass_repair"), COMPASS_REPAIR_SERIALIZER);
 
 		ItemGroupEvents.modifyEntriesEvent(ItemGroups.TOOLS).register(entries -> entries.add(EXPLORERS_COMPASS_ITEM));
 
@@ -71,6 +78,8 @@ public class ExplorersCompass implements ModInitializer {
 		ServerPlayNetworking.registerGlobalReceiver(ResetCompassPacket.ID, ResetCompassPacket::apply);
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> EXPLORERS_COMPASS_ITEM.cancelSearch(handler.player, -1));
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> VisitedStructures.get(server).forgetPosition(handler.player.getUuid()));
+		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
+				RepairDurabilityPacket.send(handler.player, ExplorersCompassConfig.compassDurability));
 		ServerTickEvents.END_SERVER_TICK.register(server -> {
 			if (server.getTicks() % 20 != 0 || server.getPlayerManager().getPlayerList().isEmpty()) return;
 			VisitedStructures history = VisitedStructures.get(server);
