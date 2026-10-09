@@ -3,6 +3,7 @@ package com.chaosthedude.explorerscompass;
 import com.chaosthedude.explorerscompass.items.ExplorersCompassItem;
 import com.chaosthedude.explorerscompass.network.SyncPacket;
 import com.chaosthedude.explorerscompass.network.SearchResultPacket;
+import com.chaosthedude.explorerscompass.network.UnlockToastPacket;
 import com.chaosthedude.explorerscompass.util.CompassState;
 
 import net.fabricmc.api.ClientModInitializer;
@@ -26,6 +27,7 @@ public class ExplorersCompassClient implements ClientModInitializer {
 	public void onInitializeClient() {
 		ClientPlayNetworking.registerGlobalReceiver(SyncPacket.ID, SyncPacket::apply);
 		ClientPlayNetworking.registerGlobalReceiver(SearchResultPacket.ID, SearchResultPacket::apply);
+		ClientPlayNetworking.registerGlobalReceiver(UnlockToastPacket.ID, UnlockToastPacket::apply);
 		
 		ModelPredicateProviderRegistry.register(ExplorersCompass.EXPLORERS_COMPASS_ITEM, new Identifier("angle"), new ClampedModelPredicateProvider() {
 			private double rotation;

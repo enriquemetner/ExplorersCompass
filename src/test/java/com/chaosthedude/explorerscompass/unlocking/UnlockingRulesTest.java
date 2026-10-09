@@ -236,6 +236,42 @@ class UnlockingRulesTest {
         assertTrue(saved.contains(player, B));
     }
 
+    @Test void notificationStateSurvivesRestartAndPendingCountsExcludeRelockedStructures() {
+        UUID player = UUID.randomUUID(), other = UUID.randomUUID();
+        UnlockedStructures saved = new UnlockedStructures();
+        assertFalse(saved.notificationsEnabled(player));
+        saved.add(player, Set.of(A, B));
+        saved.queueNotification(player, Set.of(A, B));
+        saved.remove(player, Set.of(B));
+        saved = UnlockedStructures.fromNbt(saved.writeNbt(new NbtCompound()));
+        assertEquals(1, saved.takePendingNotificationCount(player));
+        assertEquals(0, saved.takePendingNotificationCount(player));
+        assertTrue(saved.enableNotifications(player));
+        assertFalse(saved.enableNotifications(player));
+        saved.add(other, Set.of(C));
+        saved.queueNotification(other, Set.of(C));
+        saved = UnlockedStructures.fromNbt(saved.writeNbt(new NbtCompound()));
+        assertTrue(saved.notificationsEnabled(player));
+        assertFalse(saved.notificationsEnabled(other));
+        assertEquals(1, saved.takePendingNotificationCount(other));
+        saved.queueNotification(player, Set.of(A));
+        assertFalse(saved.enableNotifications(player));
+        assertEquals(1, saved.takePendingNotificationCount(player));
+    }
+
+    @Test void firstCompassClearsPendingAndKeepsAllPreviouslyUnlockedStructures() {
+        UUID player = UUID.randomUUID();
+        UnlockedStructures saved = new UnlockedStructures();
+        saved.add(player, Set.of(A));
+        saved.queueNotification(player, Set.of(A));
+        saved.add(player, Set.of(B));
+        assertTrue(saved.enableNotifications(player));
+        saved = UnlockedStructures.fromNbt(saved.writeNbt(new NbtCompound()));
+        assertEquals(2, saved.getStructures(player).size());
+        assertEquals(0, saved.takePendingNotificationCount(player));
+        assertFalse(saved.enableNotifications(player));
+    }
+
     @Test void loadingAndMalformedFileDoNotTouchPlayerData(@TempDir Path directory) throws Exception {
         UUID player = UUID.randomUUID();
         UnlockedStructures saved = new UnlockedStructures(); saved.add(player, Set.of(B));

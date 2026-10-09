@@ -147,8 +147,9 @@ public final class UnlockingRules {
 
     /** Called on compass open, not by reload or search packets. */
     public void evaluateOnOpen(ServerPlayerEntity player) {
-        UnlockedStructures.get(player.getServer()).add(player.getUuid(),
+        int added = UnlockedStructures.get(player.getServer()).add(player.getUuid(),
                 earnedOnOpen(catalog(player.getServer()).structures(), progress(player)));
+        UnlockNotifications.newlyAdded(player, added);
     }
 
     Set<Identifier> earnedOnOpen(Set<Identifier> structures, Progress progress) {
@@ -164,7 +165,8 @@ public final class UnlockingRules {
     public void onProgress(ServerPlayerEntity player, Identifier visit, Identifier advancement) {
         MinecraftServer server = player.getServer();
         if (server == null || server.getOverworld() == null) return;
-        UnlockedStructures.get(server).add(player.getUuid(), earnedOnProgress(progress(player), visit, advancement));
+        int added = UnlockedStructures.get(server).add(player.getUuid(), earnedOnProgress(progress(player), visit, advancement));
+        UnlockNotifications.newlyAdded(player, added);
     }
 
     Set<Identifier> earnedOnProgress(Progress progress, Identifier visit, Identifier advancement) {

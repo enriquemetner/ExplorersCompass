@@ -1,6 +1,8 @@
 package com.chaosthedude.explorerscompass.mixins;
 
 import com.chaosthedude.explorerscompass.unlocking.UnlockingRules;
+import com.chaosthedude.explorerscompass.unlocking.UnlockNotifications;
+import com.chaosthedude.explorerscompass.ExplorersCompass;
 import net.minecraft.advancement.Advancement;
 import net.minecraft.advancement.PlayerAdvancementTracker;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -17,7 +19,11 @@ public abstract class PlayerAdvancementTrackerMixin {
     @Inject(method = "grantCriterion", at = @At("RETURN"))
     private void explorerscompass$onProgress(Advancement advancement, String criterion, CallbackInfoReturnable<Boolean> result) {
         if (owner.getAdvancementTracker() != null && result.getReturnValueZ() && ((PlayerAdvancementTracker) (Object) this).getProgress(advancement).isDone()) {
-            UnlockingRules.get().onProgress(owner, null, advancement.getId());
+            if (advancement.getId().equals(new net.minecraft.util.Identifier(ExplorersCompass.MODID, "get_compass"))) {
+                UnlockNotifications.compassAdvancementCompleted(owner, advancement.getId());
+            } else {
+                UnlockingRules.get().onProgress(owner, null, advancement.getId());
+            }
         }
     }
 }

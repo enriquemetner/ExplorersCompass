@@ -3,6 +3,7 @@ package com.chaosthedude.explorerscompass.unlocking;
 import java.io.Reader;
 import java.nio.file.Files;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 
@@ -89,9 +90,18 @@ public final class UnlockingCommands {
                 targets = Set.of(id);
             }
         }
+        Set<Identifier> added = new HashSet<>();
+        if (unlock) {
+            added.addAll(targets);
+            added.removeAll(state.getStructures(player));
+        }
         int changed = unlock ? state.add(player, targets) : state.remove(player, targets);
+        ServerPlayerEntity online = server.getPlayerManager().getPlayer(player);
+        if (unlock && changed > 0) {
+            if (online != null) UnlockNotifications.newlyAdded(online, changed);
+            else state.queueNotification(player, added);
+        }
         if (!unlock && changed > 0) {
-            ServerPlayerEntity online = server.getPlayerManager().getPlayer(player);
             if (online != null) ExplorersCompass.EXPLORERS_COMPASS_ITEM.cancelSearch(online, -1);
         }
         context.getSource().sendFeedback(() -> Text.literal((unlock ? "Unlocked " : "Locked ") + changed + " structure types for " + player + ". Reopen the compass to refresh."), true);

@@ -75,6 +75,7 @@ public class ExplorersCompass implements ModInitializer {
 			if (server.getTicks() % 20 != 0 || server.getPlayerManager().getPlayerList().isEmpty()) return;
 			VisitedStructures history = VisitedStructures.get(server);
 			for (net.minecraft.server.network.ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+				com.chaosthedude.explorerscompass.unlocking.UnlockNotifications.deliverPending(player);
 				history.checkPlayer(player);
 			}
 		});

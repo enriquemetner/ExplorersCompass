@@ -1,0 +1,12 @@
+{
+  "criteria": {
+    "has_compass": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          { "items": ["explorerscompass:explorerscompass"] }
+        ]
+      }
+    }
+  }
+}
