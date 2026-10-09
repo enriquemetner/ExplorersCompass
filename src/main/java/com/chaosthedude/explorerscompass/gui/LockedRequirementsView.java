@@ -13,6 +13,7 @@ import org.lwjgl.glfw.GLFW;
 
 /** Modal requirements panel using the same frame and dim backdrop as the search dialog. */
 final class LockedRequirementsView {
+    static final int WINDOW_WIDTH = 260;
     private static final int BUTTON_BACKGROUND = 0xff242424;
     private static final int BUTTON_BORDER = 0xff909090;
     private final TextRenderer renderer;
@@ -35,7 +36,7 @@ final class LockedRequirementsView {
         if (this.screenWidth == screenWidth && this.screenHeight == screenHeight) return;
         this.screenWidth = screenWidth;
         this.screenHeight = screenHeight;
-        width = Math.max(40, Math.min(480, screenWidth - 24));
+        width = Math.max(40, Math.min(WINDOW_WIDTH, screenWidth - 24));
         lineHeight = renderer.fontHeight + 3;
         lines = new ArrayList<>();
         addNode(requirements, 0, false);
@@ -113,9 +114,11 @@ final class LockedRequirementsView {
         }
     }
 
-    /** Returns true when the Back button was clicked. */
+    /** Returns true when Back or the area outside the panel was clicked. */
     boolean click(double mouseX, double mouseY, int button, int width, int height) {
         layout(width, height);
+        if (mouseX < x - 1 || mouseX >= x + this.width + 1
+                || mouseY < y - 1 || mouseY >= backTop() + 26) return true;
         if (button != 0) return false;
         Scrollbar bar = scrollbar();
         if (bar.contains(mouseX, mouseY)) {

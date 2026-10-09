@@ -166,6 +166,10 @@ public class ExplorersCompassScreen extends Screen {
 	private boolean sortMenuOpen;
 	private int draggedSortRow = -1;
 	private boolean sortOrderChangedDuringDrag;
+	private Identifier entryFiltersId;
+	private int entryFilterFirstRow;
+	private static final int ENTRY_FILTER_ROW_HEIGHT = 20;
+	private record EntryFilterRow(String category, String value, int column, FilterOption option) {}
 
 	private static class FilterOption {
 		private final String label;
@@ -221,6 +225,12 @@ public class ExplorersCompassScreen extends Screen {
 
 	@Override
 	public boolean mouseScrolled(double scroll1, double scroll2, double scroll3) {
+		if (entryFiltersId != null) {
+			List<EntryFilterRow> rows = entryFilterRows();
+			entryFilterFirstRow = MathHelper.clamp(entryFilterFirstRow - (int) Math.signum(scroll3), 0,
+					Math.max(0, rows.size() - entryFilterVisibleRows(rows.size())));
+			return true;
+		}
         if (dialog == Dialog.LOCKED) { lockedRequirementsView.scroll(scroll3); return true; }
         if (dialog != Dialog.NONE) return true;
         if (hiddenStructuresOpen) {
@@ -254,6 +264,7 @@ public class ExplorersCompassScreen extends Screen {
 		if (isStructureView()) {
 			addDrawableChild(selectionList);
 		}
+		entryFiltersId = null;
 		setupTextFields();
 		rebuildFilterOptions();
 		processSearchTerm();
@@ -282,6 +293,7 @@ public class ExplorersCompassScreen extends Screen {
 
 		// Check if the allowed structure list has synced
 		if (ExplorersCompass.synced) {
+			entryFiltersId = null;
 			remove(selectionList);
 			allowedStructureIDs = new ArrayList<Identifier>(ExplorersCompass.allowedStructureIDs);
 			structureIDsMatchingSearch = new ArrayList<Identifier>(allowedStructureIDs);
@@ -350,9 +362,10 @@ public class ExplorersCompassScreen extends Screen {
 		if (settingsOpen) {
 			renderSettingsTooltip(context, mouseX, mouseY);
 		}
-		if (isStructureView() && dialog == Dialog.NONE && !sortMenuOpen && selectionList.isHideButtonHovered(mouseX, mouseY)) {
+		if (isStructureView() && dialog == Dialog.NONE && entryFiltersId == null && !sortMenuOpen && selectionList.isHideButtonHovered(mouseX, mouseY)) {
 			drawQuestionTooltip(context, "Removes the structure from the list on this client, across all worlds and servers. You can undo this in Settings.", mouseX, mouseY);
 		}
+		if (entryFiltersId != null) renderEntryFilters(context, mouseX, mouseY);
         if (dialog != Dialog.NONE) renderSearchDialog(context, mouseX, mouseY);
 	}
 
@@ -661,6 +674,104 @@ public class ExplorersCompassScreen extends Screen {
 		}
 	}
 
+	public void openEntryFilters(Identifier id) {
+		if (sortMenuOpen) closeSortMenu();
+		entryFiltersId = id;
+		entryFilterFirstRow = 0;
+	}
+
+	private List<EntryFilterRow> entryFilterRows() {
+		if (entryFiltersId == null) return List.of();
+		List<EntryFilterRow> rows = new ArrayList<>();
+		if (showSourceColumn) {
+			rows.add(new EntryFilterRow("Source:", StructureUtils.getStructureSource(entryFiltersId), 0,
+					new FilterOption("", entryFiltersId.getNamespace(), null, false)));
+		}
+		for (Identifier dimension : ExplorersCompass.allowedStructureIDsToDimensionIDs.get(entryFiltersId)) {
+			rows.add(new EntryFilterRow("Dimension:", StructureUtils.getDimensionName(dimension), 1,
+					new FilterOption("", null, dimension, false)));
+		}
+		Identifier group = ExplorersCompass.structureIDsToGroupIDs.get(entryFiltersId);
+		if (group != null) {
+			rows.add(new EntryFilterRow("Group:", StructureUtils.getStructureName(group), 2,
+					new FilterOption("", null, group, false)));
+		}
+		return rows;
+	}
+
+	private int entryFilterVisibleRows(int count) {
+		return Math.min(count, Math.max(1, (height - 70) / ENTRY_FILTER_ROW_HEIGHT));
+	}
+
+	private int entryFilterWidth() { return Math.max(40, Math.min(LockedRequirementsView.WINDOW_WIDTH, width - 24)); }
+	private int entryFilterX() { return (width - entryFilterWidth()) / 2; }
+	private int entryFilterHeight(int count) { return 65 + entryFilterVisibleRows(count) * ENTRY_FILTER_ROW_HEIGHT; }
+	private int entryFilterY(int count) { return (height - entryFilterHeight(count)) / 2; }
+
+	private void renderEntryFilters(DrawContext context, int mouseX, int mouseY) {
+		List<EntryFilterRow> rows = entryFilterRows();
+		int x = entryFilterX(), w = entryFilterWidth(), h = entryFilterHeight(rows.size());
+		int y = entryFilterY(rows.size()), bodyY = y + 30;
+		int visible = entryFilterVisibleRows(rows.size());
+		int backY = bodyY + visible * ENTRY_FILTER_ROW_HEIGHT + 10;
+		int checkboxX = x + w - 19;
+		int valueX = x + 12 + textRenderer.getWidth("Dimension:") + 8;
+		String hoveredValue = null;
+		context.getMatrices().push();
+		context.getMatrices().translate(0, 0, 300);
+		context.fill(0, 0, width, height, 0x88000000);
+		context.fill(x - 1, y - 1, x + w + 1, y + h + 1, 0xff909090);
+		context.fill(x, y, x + w, y + h, 0xff000000);
+		context.drawCenteredTextWithShadow(textRenderer, Text.literal("Filters"), x + w / 2, y + 10, 0xffffff);
+		context.enableScissor(x + 8, bodyY, x + w - 8, bodyY + visible * ENTRY_FILTER_ROW_HEIGHT);
+		for (int i = 0; i < visible; i++) {
+			EntryFilterRow row = rows.get(entryFilterFirstRow + i);
+			int rowY = bodyY + i * ENTRY_FILTER_ROW_HEIGHT;
+			if (mouseX >= x + 8 && mouseX < x + w - 8 && mouseY >= rowY && mouseY < rowY + ENTRY_FILTER_ROW_HEIGHT)
+				context.fill(x + 8, rowY, x + w - 8, rowY + ENTRY_FILTER_ROW_HEIGHT, 0xff242424);
+			context.drawTextWithShadow(textRenderer, row.category(), x + 12, rowY + 6, 0xffffff);
+			context.drawTextWithShadow(textRenderer,
+					textRenderer.trimToWidth(row.value(), Math.max(1, checkboxX - valueX - 8)), valueX, rowY + 6, 0xffffff);
+			if (textRenderer.getWidth(row.value()) > checkboxX - valueX - 8
+					&& mouseX >= valueX && mouseX < checkboxX && mouseY >= rowY && mouseY < rowY + ENTRY_FILTER_ROW_HEIGHT)
+				hoveredValue = row.value();
+			drawFilterCheckbox(context, checkboxX, rowY + 5, filterChecked(row.column(), row.option()));
+		}
+		context.disableScissor();
+		int buttonX = x + (w - 70) / 2;
+		boolean backHovered = mouseX >= buttonX && mouseX < buttonX + 70 && mouseY >= backY && mouseY < backY + 20;
+		context.fill(buttonX, backY, buttonX + 70, backY + 20, 0xff909090);
+		context.fill(buttonX + 1, backY + 1, buttonX + 69, backY + 19, backHovered ? 0xff424242 : 0xff242424);
+		context.drawCenteredTextWithShadow(textRenderer, Text.literal("Back"), x + w / 2, backY + 6, 0xffffff);
+		context.getMatrices().pop();
+		if (hoveredValue != null) context.drawTooltip(textRenderer, Text.literal(hoveredValue), mouseX, mouseY);
+	}
+
+	private boolean clickEntryFilters(double mouseX, double mouseY, int button) {
+		List<EntryFilterRow> rows = entryFilterRows();
+		int x = entryFilterX(), y = entryFilterY(rows.size()), w = entryFilterWidth();
+		if (mouseX < x - 1 || mouseX >= x + w + 1 || mouseY < y - 1 || mouseY >= y + entryFilterHeight(rows.size()) + 1) {
+			entryFiltersId = null;
+			return true;
+		}
+		if (button != 0) return true;
+		int backY = y + 30 + entryFilterVisibleRows(rows.size()) * ENTRY_FILTER_ROW_HEIGHT + 10;
+		int buttonX = x + (w - 70) / 2;
+		if (mouseX >= buttonX && mouseX < buttonX + 70 && mouseY >= backY && mouseY < backY + 20) {
+			entryFiltersId = null;
+			return true;
+		}
+		int index = (int) (mouseY - y - 30) / ENTRY_FILTER_ROW_HEIGHT;
+		if (mouseY >= y + 30 && index >= 0 && index < entryFilterVisibleRows(rows.size())) {
+			EntryFilterRow row = rows.get(entryFilterFirstRow + index);
+			double scroll = selectionList.getScrollAmount();
+			toggleFilter(row.column(), row.option());
+			selectionList.setScrollAmount(scroll);
+			if (!selectionList.containsStructure(entryFiltersId)) entryFiltersId = null;
+		}
+		return true;
+	}
+
 	private void drawFilterCheckbox(DrawContext context, int x, int y, boolean checked) {
 		context.fill(x, y, x + FILTER_CHECKBOX_SIZE, y + FILTER_CHECKBOX_SIZE, 0xffb0b0b0);
 		context.fill(x + 1, y + 1, x + FILTER_CHECKBOX_SIZE - 1, y + FILTER_CHECKBOX_SIZE - 1, 0xff161616);
@@ -881,31 +992,32 @@ public class ExplorersCompassScreen extends Screen {
 	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
 		draggingStructureScrollbar = button == 0 && dialog == Dialog.NONE
-				&& !filtersOpen && !settingsOpen && !hiddenStructuresOpen && !sortMenuOpen
+				&& entryFiltersId == null && !filtersOpen && !settingsOpen && !hiddenStructuresOpen && !sortMenuOpen
 				&& selectionList != null && selectionList.isScrollbarAt(mouseX, mouseY);
 		try {
 			return handleMouseClicked(mouseX, mouseY, button);
 		} finally {
 			// Minecraft routes drag events to the focused child. Keep the list focused
 			// after grabbing its scrollbar instead of returning focus to search.
-			if (client.currentScreen == this && dialog == Dialog.NONE && !draggingStructureScrollbar) focusActiveSearchField();
+			if (client.currentScreen == this && dialog == Dialog.NONE && entryFiltersId == null && !draggingStructureScrollbar) focusActiveSearchField();
 		}
 	}
 
 	private boolean handleMouseClicked(double mouseX, double mouseY, int button) {
+		if (entryFiltersId != null) return clickEntryFilters(mouseX, mouseY, button);
         if (dialog == Dialog.LOCKED) {
             if (lockedRequirementsView.click(mouseX, mouseY, button, width, height)) dismissDialog();
             return true;
         }
         if (dialog != Dialog.NONE) {
+            if (mouseX < dialogX() - 1 || mouseX >= dialogX() + dialogWidth() + 1
+                    || mouseY < dialogY() - 1 || mouseY >= dialogY() + dialogHeight() + 1) {
+                dismissDialog();
+                return true;
+            }
             if (dialog == Dialog.WRONG_DIMENSION || dialog == Dialog.INSUFFICIENT_XP) { dismissDialog(); return true; }
             if (button == 0) {
                 int x = dialogX(), y = dialogY(), w = dialogWidth();
-                if ((dialog == Dialog.FOUND || dialog == Dialog.NOT_FOUND)
-                        && (mouseX < x - 1 || mouseX >= x + w + 1 || mouseY < y - 1 || mouseY >= y + dialogHeight() + 1)) {
-                    dismissDialog();
-                    return true;
-                }
                 if (dialog == Dialog.SEARCHING && mouseX >= x + (w - 70) / 2 && mouseX < x + (w + 70) / 2 && mouseY >= y + searchingBackY() && mouseY < y + searchingBackY() + 20) dismissDialog();
                 else if (dialog == Dialog.FOUND && ExplorersCompass.canTeleport && mouseX >= x + (w - 100) / 2 && mouseX < x + (w + 100) / 2 && mouseY >= y + 94 && mouseY < y + 114) teleport();
                 else if (dialog == Dialog.FOUND && mouseX >= x + (w - 70) / 2 && mouseX < x + (w + 70) / 2 && mouseY >= y + (ExplorersCompass.canTeleport ? 117 : 94) && mouseY < y + (ExplorersCompass.canTeleport ? 137 : 114)) dismissDialog();
@@ -999,6 +1111,7 @@ public class ExplorersCompassScreen extends Screen {
 
 	@Override
 	public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+		if (entryFiltersId != null) return true;
         if (dialog == Dialog.LOCKED) { lockedRequirementsView.drag(mouseY); return true; }
 		if (draggedScrollbar != null && button == 0) {
 			moveScrollbar(mouseY);
@@ -1021,6 +1134,7 @@ public class ExplorersCompassScreen extends Screen {
 
 	@Override
 	public boolean mouseReleased(double mouseX, double mouseY, int button) {
+		if (entryFiltersId != null) return true;
         if (draggingStructureScrollbar && button == 0) {
             draggingStructureScrollbar = false;
             super.mouseReleased(mouseX, mouseY, button);
@@ -1042,6 +1156,10 @@ public class ExplorersCompassScreen extends Screen {
 
 	@Override
 	public boolean keyPressed(int par1, int par2, int par3) {
+		if (entryFiltersId != null) {
+			if (par1 == 256) entryFiltersId = null;
+			return true;
+		}
         if (dialog != Dialog.NONE) {
             if (par1 == 256) dismissDialog();
             else if (dialog == Dialog.LOCKED) lockedRequirementsView.keyPressed(par1);
@@ -1084,7 +1202,7 @@ public class ExplorersCompassScreen extends Screen {
 
 	@Override
 	public boolean charTyped(char typedChar, int keyCode) {
-		if (dialog != Dialog.NONE) return true;
+		if (dialog != Dialog.NONE || entryFiltersId != null) return true;
 		boolean ret = super.charTyped(typedChar, keyCode);
 		focusActiveSearchField();
 		return ret;
@@ -1121,6 +1239,7 @@ public class ExplorersCompassScreen extends Screen {
 		if (sortMenuOpen) {
 			closeSortMenu();
 		}
+		entryFiltersId = null;
 		filtersOpen = open;
 		if (open) {
 			pendingHiddenStructures.clear();
@@ -1148,6 +1267,7 @@ public class ExplorersCompassScreen extends Screen {
 		if (sortMenuOpen) {
 			closeSortMenu();
 		}
+		entryFiltersId = null;
 		settingsOpen = open;
 		if (open) {
 			pendingHiddenStructures.clear();
@@ -1596,8 +1716,7 @@ public class ExplorersCompassScreen extends Screen {
 	}
 
 	public int rowActionButtonWidth() {
-		return Math.max(textRenderer.getWidth(Text.literal("Hide")),
-				textRenderer.getWidth(Text.literal("Undo"))) + 4;
+		return textRenderer.getWidth(Text.literal("filters")) + 6;
 	}
 
 	public void toggleStructureHidden(Identifier id) {

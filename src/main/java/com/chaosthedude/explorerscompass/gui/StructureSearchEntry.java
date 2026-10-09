@@ -39,7 +39,7 @@ public class StructureSearchEntry extends AlwaysSelectedEntryListWidget.Entry<St
         int infoColor = !locked ? 0x808080 : 0x707070;
         int buttonWidth = parentScreen.rowActionButtonWidth();
         int buttonX = left + width - buttonWidth - 8;
-        int buttonY = top + (height - 20) / 2;
+        int buttonY = top + (height - 42) / 2;
         int textWidth = Math.max(1, buttonX - left - 10);
         String readableName = StructureUtils.getStructureName(structureID);
         int nameY = top + (height / 2) - ((client.textRenderer.fontHeight + 2) * 2);
@@ -64,11 +64,16 @@ public class StructureSearchEntry extends AlwaysSelectedEntryListWidget.Entry<St
         context.drawText(client.textRenderer, client.textRenderer.trimToWidth(Text.literal("Source").getString() + ": " + StructureUtils.getStructureSource(structureID), textWidth), left + 5, top + (height / 2) - ((client.textRenderer.fontHeight + 2) * 1), infoColor, true);
         context.drawText(client.textRenderer, client.textRenderer.trimToWidth(Text.literal("Group").getString() + ": " + StructureUtils.getStructureName(ExplorersCompass.structureIDsToGroupIDs.get(structureID)), textWidth), left + 5, top + (height / 2) - ((client.textRenderer.fontHeight + 2) * 0), infoColor, true);
         context.drawText(client.textRenderer, client.textRenderer.trimToWidth(Text.literal("Dimension").getString() + ": " + StructureUtils.structureDimensionsToString(ExplorersCompass.allowedStructureIDsToDimensionIDs.get(structureID)), textWidth), left + 5, top + (height / 2) + ((client.textRenderer.fontHeight + 2) * 1), infoColor, true);
+        boolean filterHovered = structuresList.isFilterButtonClick(this, mouseX, mouseY);
+        context.fill(buttonX, buttonY, buttonX + buttonWidth, buttonY + 20, 0xff909090);
+        context.fill(buttonX + 1, buttonY + 1, buttonX + buttonWidth - 1, buttonY + 19, filterHovered ? 0xff424242 : 0xff242424);
+        context.drawCenteredTextWithShadow(client.textRenderer, Text.literal("filters"), buttonX + buttonWidth / 2, buttonY + 6, 0xffffff);
+        buttonY += 22;
         boolean buttonHovered = structuresList.isActionButtonClick(this, mouseX, mouseY);
         context.fill(buttonX, buttonY, buttonX + buttonWidth, buttonY + 20, 0xff909090);
         context.fill(buttonX + 1, buttonY + 1, buttonX + buttonWidth - 1, buttonY + 19, buttonHovered ? 0xff424242 : 0xff242424);
         context.drawCenteredTextWithShadow(client.textRenderer, Text.literal(parentScreen.isStructureHidden(structureID)
-                ? "Undo" : "Hide"), buttonX + buttonWidth / 2, buttonY + 6, 0xffffff);
+                ? "Undo" : "hide"), buttonX + buttonWidth / 2, buttonY + 6, 0xffffff);
         if (locked) {
             context.fill(left, top, left + width, top + height, 0x33000000);
             context.drawCenteredTextWithShadow(client.textRenderer, Text.literal("Locked"),
@@ -80,6 +85,12 @@ public class StructureSearchEntry extends AlwaysSelectedEntryListWidget.Entry<St
 	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
 		if (button == 0 && isEnabled()) {
+			if (structuresList.isFilterButtonClick(this, mouseX, mouseY)) {
+				client.getSoundManager().play(PositionedSoundInstance.master(SoundEvents.UI_BUTTON_CLICK, 1.0F));
+				parentScreen.openEntryFilters(structureID);
+				lastClickTime = 0;
+				return true;
+			}
 			if (structuresList.isActionButtonClick(this, mouseX, mouseY)) {
 				client.getSoundManager().play(PositionedSoundInstance.master(SoundEvents.UI_BUTTON_CLICK, 1.0F));
 				parentScreen.toggleStructureHidden(structureID);

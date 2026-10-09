@@ -189,12 +189,27 @@ public class StructureSearchList extends AlwaysSelectedEntryListWidget<Structure
 	}
 
 	public boolean isActionButtonClick(StructureSearchEntry entry, double mouseX, double mouseY) {
+		return isRowButtonClick(entry, mouseX, mouseY, false);
+	}
+
+	public boolean isFilterButtonClick(StructureSearchEntry entry, double mouseX, double mouseY) {
+		return isRowButtonClick(entry, mouseX, mouseY, true);
+	}
+
+	private boolean isRowButtonClick(StructureSearchEntry entry, double mouseX, double mouseY, boolean filter) {
 		int index = children().indexOf(entry);
 		if (index < 0) return false;
 		int buttonX = getRowLeft() + getRowWidth() - parentScreen.rowActionButtonWidth() - 8;
-		int buttonY = getRowTop(index) + (itemHeight - 20) / 2;
+		int buttonY = getRowTop(index) + (itemHeight - 42) / 2 + (filter ? 0 : 22);
 		return mouseX >= buttonX && mouseX < buttonX + parentScreen.rowActionButtonWidth()
 				&& mouseY >= Math.max(buttonY, top) && mouseY < Math.min(buttonY + 20, fullRowsBottom());
+	}
+
+	public boolean containsStructure(Identifier id) {
+		for (StructureSearchEntry entry : children()) {
+			if (entry.getStructureID().equals(id)) return true;
+		}
+		return false;
 	}
 
 	public boolean isHideButtonHovered(double mouseX, double mouseY) {
