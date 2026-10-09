@@ -272,6 +272,18 @@ class UnlockingRulesTest {
         assertFalse(saved.enableNotifications(player));
     }
 
+    @Test void reearnedCompassRestoresOnlyNewlyUnlockedStructureTypes() {
+        UUID player = UUID.randomUUID();
+        UnlockedStructures saved = new UnlockedStructures();
+        UnlockingRules rules = rules("{}");
+        Progress progress = new Progress();
+        saved.add(player, STRUCTURES);
+        saved.enableNotifications(player);
+        saved.remove(player, Set.of(A, B));
+        assertEquals(2, saved.add(player, rules.earnedOnOpen(STRUCTURES, progress)));
+        assertEquals(0, saved.add(player, rules.earnedOnOpen(STRUCTURES, progress)));
+    }
+
     @Test void loadingAndMalformedFileDoNotTouchPlayerData(@TempDir Path directory) throws Exception {
         UUID player = UUID.randomUUID();
         UnlockedStructures saved = new UnlockedStructures(); saved.add(player, Set.of(B));

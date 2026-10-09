@@ -145,7 +145,7 @@ public final class UnlockingRules {
         return UnlockedStructures.get(server).contains(player, structure);
     }
 
-    /** Called on compass open, not by reload or search packets. */
+    /** Called on compass open or when the compass advancement is earned. */
     public void evaluateOnOpen(ServerPlayerEntity player) {
         int added = UnlockedStructures.get(player.getServer()).add(player.getUuid(),
                 earnedOnOpen(catalog(player.getServer()).structures(), progress(player)));

@@ -2,7 +2,6 @@ package com.chaosthedude.explorerscompass.unlocking;
 
 import com.chaosthedude.explorerscompass.network.UnlockToastPacket;
 import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.Identifier;
 
 /** Sends one notification per newly earned batch after the first compass. */
 public final class UnlockNotifications {
@@ -14,10 +13,12 @@ public final class UnlockNotifications {
         }
     }
 
-    public static void compassAdvancementCompleted(ServerPlayerEntity player, Identifier advancement) {
+    public static void compassAdvancementCompleted(ServerPlayerEntity player) {
         UnlockedStructures state = UnlockedStructures.get(player.getServer());
         if (state.notificationsEnabled(player.getUuid())) {
-            UnlockingRules.get().onProgress(player, null, advancement);
+            // A revoked and re-earned compass is another opportunity to restore
+            // currently satisfied defaults and rules, but only new IDs get a toast.
+            UnlockingRules.get().evaluateOnOpen(player);
             return;
         }
         UnlockingRules.get().evaluateOnOpen(player);

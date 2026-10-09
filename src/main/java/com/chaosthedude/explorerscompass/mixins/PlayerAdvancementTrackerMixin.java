@@ -20,7 +20,7 @@ public abstract class PlayerAdvancementTrackerMixin {
     private void explorerscompass$onProgress(Advancement advancement, String criterion, CallbackInfoReturnable<Boolean> result) {
         if (owner.getAdvancementTracker() != null && result.getReturnValueZ() && ((PlayerAdvancementTracker) (Object) this).getProgress(advancement).isDone()) {
             if (advancement.getId().equals(new net.minecraft.util.Identifier(ExplorersCompass.MODID, "get_compass"))) {
-                UnlockNotifications.compassAdvancementCompleted(owner, advancement.getId());
+                UnlockNotifications.compassAdvancementCompleted(owner);
             } else {
                 UnlockingRules.get().onProgress(owner, null, advancement.getId());
             }
