@@ -75,6 +75,10 @@ public class StructureSearchList extends AlwaysSelectedEntryListWidget<Structure
 		return new Scrollbar(getScrollbarPositionX(), top, bottom, thumbHeight, getScrollAmount(), getMaxScroll());
 	}
 
+	public boolean isScrollbarAt(double mouseX, double mouseY) {
+		return scrollbar().contains(mouseX, mouseY);
+	}
+
 	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
 		if (mouseX < getScrollbarPositionX() && mouseY >= fullRowsBottom() && mouseY < bottom) {

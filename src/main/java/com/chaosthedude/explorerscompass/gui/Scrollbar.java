@@ -71,8 +71,12 @@ final class Scrollbar {
 	}
 
 	void render(DrawContext context) {
+		render(context, RenderUtils.getBackgroundColor(false, false), RenderUtils.getBackgroundColor(true, true));
+	}
+
+	void render(DrawContext context, int trackColor, int thumbColor) {
 		if (!isVisible()) return;
-		context.fill(x, top, x + WIDTH, bottom, RenderUtils.getBackgroundColor(false, false));
-		RenderUtils.drawScrollbarThumb(context, x, thumbTop(), WIDTH, thumbHeight, RenderUtils.getBackgroundColor(true, true));
+		context.fill(x, top, x + WIDTH, bottom, trackColor);
+		RenderUtils.drawScrollbarThumb(context, x, thumbTop(), WIDTH, thumbHeight, thumbColor);
 	}
 }

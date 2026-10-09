@@ -158,6 +158,7 @@ public class ExplorersCompassScreen extends Screen {
 	private int settingsFirstRow;
 	private enum ScrollPanel { FILTERS, SETTINGS, HIDDEN }
 	private ScrollPanel draggedScrollbar;
+	private boolean draggingStructureScrollbar;
 	private double scrollbarGrabOffset;
 	private final List<List<FilterOption>> filterOptions = List.of(new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
 	private boolean showSourceColumn = true;
@@ -879,10 +880,15 @@ public class ExplorersCompassScreen extends Screen {
 
 	@Override
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
+		draggingStructureScrollbar = button == 0 && dialog == Dialog.NONE
+				&& !filtersOpen && !settingsOpen && !hiddenStructuresOpen && !sortMenuOpen
+				&& selectionList != null && selectionList.isScrollbarAt(mouseX, mouseY);
 		try {
 			return handleMouseClicked(mouseX, mouseY, button);
 		} finally {
-			if (client.currentScreen == this && dialog == Dialog.NONE) focusActiveSearchField();
+			// Minecraft routes drag events to the focused child. Keep the list focused
+			// after grabbing its scrollbar instead of returning focus to search.
+			if (client.currentScreen == this && dialog == Dialog.NONE && !draggingStructureScrollbar) focusActiveSearchField();
 		}
 	}
 
@@ -1015,6 +1021,12 @@ public class ExplorersCompassScreen extends Screen {
 
 	@Override
 	public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (draggingStructureScrollbar && button == 0) {
+            draggingStructureScrollbar = false;
+            super.mouseReleased(mouseX, mouseY, button);
+            if (client.currentScreen == this && dialog == Dialog.NONE) focusActiveSearchField();
+            return true;
+        }
         if (dialog == Dialog.LOCKED) { lockedRequirementsView.release(); return true; }
 		if (draggedScrollbar != null && button == 0) {
 			draggedScrollbar = null;

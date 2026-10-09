@@ -13,6 +13,8 @@ import org.lwjgl.glfw.GLFW;
 
 /** Modal requirements panel using the same frame and dim backdrop as the search dialog. */
 final class LockedRequirementsView {
+    private static final int BUTTON_BACKGROUND = 0xff242424;
+    private static final int BUTTON_BORDER = 0xff909090;
     private final TextRenderer renderer;
     private final RequirementNode requirements;
     private record Row(OrderedText text, int indent, Boolean ticked, boolean bulletless,
@@ -95,11 +97,12 @@ final class LockedRequirementsView {
                     && mouseY < Math.min(rowY + renderer.fontHeight, bodyTop() + bodyHeight)) hoveredAdvancement = row;
         }
         context.disableScissor();
-        scrollbar().render(context);
+        // The thumb's transparent grip dots reveal the track color.
+        scrollbar().render(context, BUTTON_BORDER, BUTTON_BACKGROUND);
         int buttonX = x + (width - 70) / 2;
         boolean hovered = mouseX >= buttonX && mouseX < buttonX + 70 && mouseY >= backTop() && mouseY < backTop() + 20;
-        context.fill(buttonX, backTop(), buttonX + 70, backTop() + 20, 0xff909090);
-        context.fill(buttonX + 1, backTop() + 1, buttonX + 69, backTop() + 19, hovered ? 0xff424242 : 0xff242424);
+        context.fill(buttonX, backTop(), buttonX + 70, backTop() + 20, BUTTON_BORDER);
+        context.fill(buttonX + 1, backTop() + 1, buttonX + 69, backTop() + 19, hovered ? 0xff424242 : BUTTON_BACKGROUND);
         context.drawCenteredTextWithShadow(renderer, Text.literal("Back"), x + width / 2, backTop() + 6, 0xffffff);
         context.getMatrices().pop();
         if (hoveredAdvancement != null) {
