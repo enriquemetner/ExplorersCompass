@@ -68,6 +68,8 @@ public class ExplorersCompassScreen extends Screen {
 	private static final int SETTINGS_CONTROL_WIDTH = 90;
 	private static String sessionSearchText = "";
 	private static final int HIDE_BUTTON_WIDTH = 100;
+	private static final int FOUND_ACTION_BUTTON_WIDTH = 70;
+	private static final int FOUND_ACTION_BUTTON_GAP = 5;
 	private static final int KEEP_SEARCHING_BUTTON_WIDTH = 100;
 	private static final int NOT_FOUND_BUTTON_GAP = 5;
 	private static final String[] SETTINGS_LABELS = {
@@ -1047,7 +1049,10 @@ public class ExplorersCompassScreen extends Screen {
                 int x = dialogX(), y = dialogY(), w = dialogWidth();
                 if (dialog == Dialog.SEARCHING && mouseX >= x + (w - 70) / 2 && mouseX < x + (w + 70) / 2 && mouseY >= y + searchingBackY() && mouseY < y + searchingBackY() + 20) dismissDialog();
                 else if (dialog == Dialog.FOUND && ExplorersCompass.canTeleport && mouseX >= x + (w - 100) / 2 && mouseX < x + (w + 100) / 2 && mouseY >= y + 94 && mouseY < y + 114) teleport();
-                else if (dialog == Dialog.FOUND && mouseX >= x + (w - 70) / 2 && mouseX < x + (w + 70) / 2 && mouseY >= y + (ExplorersCompass.canTeleport ? 117 : 94) && mouseY < y + (ExplorersCompass.canTeleport ? 137 : 114)) dismissDialog();
+                else if (dialog == Dialog.FOUND && mouseX >= foundBackX() && mouseX < foundBackX() + FOUND_ACTION_BUTTON_WIDTH
+                        && mouseY >= foundActionsY() && mouseY < foundActionsY() + 20) dismissDialog();
+                else if (dialog == Dialog.FOUND && mouseX >= foundCloseX() && mouseX < foundCloseX() + FOUND_ACTION_BUTTON_WIDTH
+                        && mouseY >= foundActionsY() && mouseY < foundActionsY() + 20) client.setScreen(null);
                 else if (dialog == Dialog.NOT_FOUND && failedCanContinue && mouseX >= notFoundKeepX() && mouseX < notFoundKeepX() + KEEP_SEARCHING_BUTTON_WIDTH && mouseY >= y + notFoundHideY() && mouseY < y + notFoundHideY() + 20) keepSearching();
                 else if (dialog == Dialog.NOT_FOUND && mouseX >= notFoundHideX() && mouseX < notFoundHideX() + HIDE_BUTTON_WIDTH && mouseY >= y + notFoundHideY() && mouseY < y + notFoundHideY() + 20) hideFailedSearch();
                 else if ((dialog == Dialog.NOT_FOUND || dialog == Dialog.REJECTED) && mouseX >= x + (w - 70) / 2 && mouseX < x + (w + 70) / 2 && mouseY >= y + (dialog == Dialog.NOT_FOUND ? notFoundBackY() : 57) && mouseY < y + (dialog == Dialog.NOT_FOUND ? notFoundBackY() : 57) + 20) dismissDialog();
@@ -1514,6 +1519,9 @@ public class ExplorersCompassScreen extends Screen {
     private int notFoundKeepX() { return dialogX() + (dialogWidth() - KEEP_SEARCHING_BUTTON_WIDTH - NOT_FOUND_BUTTON_GAP - HIDE_BUTTON_WIDTH) / 2; }
     private int notFoundHideX() { return notFoundKeepX() + KEEP_SEARCHING_BUTTON_WIDTH + NOT_FOUND_BUTTON_GAP; }
     private int notFoundBackY() { return notFoundHideY() + 23; }
+	private int foundBackX() { return dialogX() + (dialogWidth() - FOUND_ACTION_BUTTON_WIDTH * 2 - FOUND_ACTION_BUTTON_GAP) / 2; }
+	private int foundCloseX() { return foundBackX() + FOUND_ACTION_BUTTON_WIDTH + FOUND_ACTION_BUTTON_GAP; }
+	private int foundActionsY() { return dialogY() + (ExplorersCompass.canTeleport ? 117 : 94); }
     private Text wrongDimensionCountText() { return Text.literal("Wrong dimension for " + listedSkippedCount + (listedSkippedCount == 1 ? " structure" : " structures")); }
     private int dialogHeight() { return dialog == Dialog.WRONG_DIMENSION ? textRenderer.fontHeight + 12 : dialog == Dialog.INSUFFICIENT_XP ? textRenderer.fontHeight * 2 + 16 : dialog == Dialog.SEARCHING ? searchingBackY() + 25 : dialog == Dialog.FOUND ? (ExplorersCompass.canTeleport ? 142 : 119) : dialog == Dialog.NOT_FOUND ? notFoundBackY() + 25 : 80; }
     private int dialogX() { return (width - dialogWidth()) / 2; }
@@ -1650,7 +1658,8 @@ public class ExplorersCompassScreen extends Screen {
             if (ExplorersCompass.canTeleport) {
                 drawDialogButton(context, Text.literal("Teleport").getString(), x + (w - 100) / 2, y + 94, 100, mouseX, mouseY);
             }
-            drawDialogButton(context, Text.literal("Back").getString(), x + (w - 70) / 2, y + (ExplorersCompass.canTeleport ? 117 : 94), 70, mouseX, mouseY);
+            drawDialogButton(context, Text.literal("Back").getString(), foundBackX(), foundActionsY(), FOUND_ACTION_BUTTON_WIDTH, mouseX, mouseY);
+            drawDialogButton(context, Text.literal("Close").getString(), foundCloseX(), foundActionsY(), FOUND_ACTION_BUTTON_WIDTH, mouseX, mouseY);
         } else if (dialog == Dialog.INSUFFICIENT_XP) {
             context.drawCenteredTextWithShadow(textRenderer, Text.literal("You don't have enough levels, buddy!"), x + w / 2, y + 6, 0xffff4444);
             int lineX = x + (w - xpCostLineWidth()) / 2;
