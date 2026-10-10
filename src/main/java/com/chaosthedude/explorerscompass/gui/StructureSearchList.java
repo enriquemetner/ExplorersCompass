@@ -162,6 +162,17 @@ public class StructureSearchList extends AlwaysSelectedEntryListWidget<Structure
 		refreshList(null);
 	}
 
+	public void focusStructure(Identifier id) {
+		if (id == null) return;
+		for (int index = 0; index < getEntryCount(); index++) {
+			StructureSearchEntry entry = getEntry(index);
+			if (!entry.getStructureID().equals(id)) continue;
+			setSelected(entry);
+			setScrollAmount(getScrollAmount() + getRowTop(index) - top);
+			return;
+		}
+	}
+
 	public boolean hasSelection() {
 		return getSelectedOrNull() != null;
 	}

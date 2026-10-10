@@ -272,6 +272,7 @@ public class ExplorersCompassScreen extends Screen {
 		setupTextFields();
 		rebuildFilterOptions();
 		processSearchTerm();
+		if (isStructureView()) selectionList.focusStructure(foundStructureId);
 		focusActiveSearchField();
 	}
 
@@ -313,6 +314,7 @@ public class ExplorersCompassScreen extends Screen {
 			updateViewButtons();
 			rebuildFilterOptions();
 			processSearchTerm();
+			if (isStructureView()) selectionList.focusStructure(foundStructureId);
 			focusActiveSearchField();
 
 			ExplorersCompass.synced = false;
@@ -1412,7 +1414,9 @@ public class ExplorersCompassScreen extends Screen {
                 this.foundX = foundX;
                 this.foundZ = foundZ;
                 showFoundCoordinates = displayCoordinates;
+				double scrollAmount = selectionList.getScrollAmount();
 				selectionList.refreshList(true);
+				selectionList.setScrollAmount(scrollAmount);
                 dialog = Dialog.FOUND;
             }
         } else if (result == SearchResultPacket.NOT_FOUND) {
