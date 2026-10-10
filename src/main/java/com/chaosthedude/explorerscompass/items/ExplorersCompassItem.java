@@ -87,9 +87,8 @@ public class ExplorersCompassItem extends Item {
 		clearSearchData(stack);
 	}
 
-	private void rejectWrongDimension(PlayerEntity player, ItemStack stack, int requestId) {
+	private void rejectWrongDimension(PlayerEntity player, int requestId) {
 		cancelSearch(player, -1);
-		clearCompassTarget(stack);
 		SearchResultPacket.send((ServerPlayerEntity) player, requestId, SearchResultPacket.WRONG_DIMENSION, 0);
 	}
 
@@ -207,7 +206,7 @@ public class ExplorersCompassItem extends Item {
 			List<Structure> structures = new ArrayList<Structure>();
             structureIds = searchableInDimension(world, structureIds);
             if (structureIds.isEmpty()) {
-				rejectWrongDimension(player, stack, requestId);
+				rejectWrongDimension(player, requestId);
                 return;
             }
 			if (rejectIfInsufficientXp(player, requestId)) return;
@@ -246,7 +245,7 @@ public class ExplorersCompassItem extends Item {
         }
         List<Identifier> searchable = searchableInDimension(world, uniqueIds);
         if (searchable.size() != uniqueIds.size()) {
-            rejectWrongDimension(player, stack, requestId);
+            rejectWrongDimension(player, requestId);
             return;
         }
 		if (rejectIfInsufficientXp(player, requestId)) return;
@@ -268,7 +267,7 @@ public class ExplorersCompassItem extends Item {
 			return;
 		}
 		if (session.world != world) {
-			rejectWrongDimension(player, stack, requestId);
+			rejectWrongDimension(player, requestId);
 			return;
 		}
 		if (rejectIfInsufficientXp(player, requestId)) {
@@ -315,13 +314,7 @@ public class ExplorersCompassItem extends Item {
         session.workers.pop();
         boolean started = session.workers.start();
 		if (!started) {
-			clearSearchData(stack);
-			if (ItemUtils.verifyNBT(stack)) {
-				stack.getNbt().putString("StructureID", session.searchId.toString());
-				stack.getNbt().putInt("State", CompassState.NOT_FOUND.getID());
-				stack.getNbt().putInt("SearchRadius", session.radiusLimit);
-				stack.getNbt().putInt("Samples", samples);
-			}
+			stack.setNbt(session.previousNbt == null ? null : session.previousNbt.copy());
 			boolean canContinue = session.radiusLimit < MAX_SEARCH_RADIUS;
 			if (canContinue) {
 				session.awaitingContinuation = true;

@@ -21,7 +21,6 @@ import com.chaosthedude.explorerscompass.network.SearchListedPacket;
 import com.chaosthedude.explorerscompass.network.CancelSearchPacket;
 import com.chaosthedude.explorerscompass.network.ContinueSearchPacket;
 import com.chaosthedude.explorerscompass.network.SearchResultPacket;
-import com.chaosthedude.explorerscompass.network.ResetCompassPacket;
 import com.chaosthedude.explorerscompass.network.TeleportPacket;
 import com.chaosthedude.explorerscompass.sorting.SortCriterion;
 import com.chaosthedude.explorerscompass.util.CompassState;
@@ -1347,7 +1346,7 @@ public class ExplorersCompassScreen extends Screen {
             return false;
         }
         if (!validDimension(id, group)) {
-            showWrongDimension(true);
+            showWrongDimension();
             return false;
         }
         if (!canAffordSearch()) {
@@ -1385,7 +1384,7 @@ public class ExplorersCompassScreen extends Screen {
         List<Identifier> eligible = new ArrayList<>();
         for (Identifier id : selected) if (validDimension(id, false)) eligible.add(id);
         if (eligible.isEmpty()) {
-            showWrongDimension(true);
+            showWrongDimension();
             return;
         }
         if (!canAffordSearch()) {
@@ -1429,7 +1428,7 @@ public class ExplorersCompassScreen extends Screen {
             notFoundCompassSpeed = 0.0D;
             dialog = Dialog.NOT_FOUND;
         } else if (result == SearchResultPacket.WRONG_DIMENSION) {
-            showWrongDimension(false);
+            showWrongDimension();
         } else if (result == SearchResultPacket.INSUFFICIENT_XP) {
             showInsufficientXp(radius);
         } else {
@@ -1448,16 +1447,7 @@ public class ExplorersCompassScreen extends Screen {
         dialogStarted = System.currentTimeMillis();
     }
 
-    private void showWrongDimension(boolean notifyServer) {
-        ItemStack heldCompass = client.player == null ? ItemStack.EMPTY : ItemUtils.getHeldItem(client.player, ExplorersCompass.EXPLORERS_COMPASS_ITEM);
-        if (!heldCompass.isEmpty()) explorersCompass.clearCompassTarget(heldCompass);
-        foundStructureId = null;
-        foundX = 0;
-        foundZ = 0;
-        showFoundCoordinates = false;
-        if (notifyServer && client.getNetworkHandler() != null) {
-            ClientPlayNetworking.send(ResetCompassPacket.ID, new ResetCompassPacket());
-        }
+    private void showWrongDimension() {
         dialog = Dialog.WRONG_DIMENSION;
         dialogStarted = System.currentTimeMillis();
     }
