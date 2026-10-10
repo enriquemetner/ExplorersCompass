@@ -29,6 +29,7 @@ public class ExplorersCompassConfig {
 	public static boolean allowTeleport = true;
 	public static boolean allowExcludeVisited = true;
 	public static boolean displayCoordinates = true;
+	public static boolean displayDistance = true;
 	public static int maxSamples = 100000;
 	public static int compassDurability = 0;
 	public static int defaultXpCost = 0;
@@ -144,6 +145,7 @@ public class ExplorersCompassConfig {
 		allowTeleport = bool(config, "permissions.allowTeleport", allowTeleport);
 		allowExcludeVisited = bool(config, "search.allowExcludeVisited", allowExcludeVisited);
 		displayCoordinates = bool(config, "compass.displayCoordinates", displayCoordinates);
+		displayDistance = bool(config, "compass.displayDistance", displayDistance);
 		maxSamples = number(config, "search.maxSamples", maxSamples, 1);
 		compassDurability = number(config, "compass.compassDurability", compassDurability, 0);
 		defaultXpCost = number(config, "search.defaultXpCost", defaultXpCost, 0);
@@ -181,7 +183,8 @@ public class ExplorersCompassConfig {
 	private static void writeCommon(CommentedConfig config) {
 		put(config, "permissions.allowTeleport", allowTeleport, "Allow teleporting to a located structure when permitted by player permissions.");
 		put(config, "search.allowExcludeVisited", allowExcludeVisited, "Allow players to exclude visited structure instances from searches. Visits are always recorded.");
-		put(config, "compass.displayCoordinates", displayCoordinates, "Show precise coordinates and distance for located structures.");
+		put(config, "compass.displayCoordinates", displayCoordinates, "Show precise coordinates for located structures.");
+		put(config, "compass.displayDistance", displayDistance, "Show distance to located structures.");
 		put(config, "search.maxSamples", maxSamples, "Maximum search samples; must be at least 1.");
 		put(config, "compass.compassDurability", compassDurability, "Successful searches before the compass breaks; 0 disables durability.");
 		put(config, "search.defaultXpCost", defaultXpCost, "XP levels consumed after a successful search.");

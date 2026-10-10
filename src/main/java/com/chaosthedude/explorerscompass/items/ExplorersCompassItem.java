@@ -94,16 +94,16 @@ public class ExplorersCompassItem extends Item {
 	}
 
     private void finishSearch(PlayerEntity player, int result, int radius) {
-        finishSearch(player, result, radius, null, 0, 0, false);
+        finishSearch(player, result, radius, null, 0, 0, false, false);
     }
 
-    private void finishSearch(PlayerEntity player, int result, int radius, Identifier foundId, int foundX, int foundZ, boolean displayCoordinates) {
+    private void finishSearch(PlayerEntity player, int result, int radius, Identifier foundId, int foundX, int foundZ, boolean displayCoordinates, boolean displayDistance) {
         SearchSession session = searches.remove(player.getUuid());
         if (session != null) {
             session.workers.stop();
             session.workers.clear();
             if (player instanceof ServerPlayerEntity serverPlayer) {
-                SearchResultPacket.send(serverPlayer, session.requestId, result, radius, foundId, foundX, foundZ, displayCoordinates);
+                SearchResultPacket.send(serverPlayer, session.requestId, result, radius, foundId, foundX, foundZ, displayCoordinates, displayDistance);
             }
         }
     }
@@ -284,7 +284,7 @@ public class ExplorersCompassItem extends Item {
 		if (!session.workers.start()) fail(player, stack, session.searchId, 0, 0);
 	}
 
-	public void succeed(PlayerEntity player, ItemStack stack, Identifier structureID, int x, int z, int samples, boolean displayCoordinates) {
+	public void succeed(PlayerEntity player, ItemStack stack, Identifier structureID, int x, int z, int samples, boolean displayCoordinates, boolean displayDistance) {
 		SearchSession session = searches.get(player.getUuid());
 		if (session == null || session.stack != stack || structureID == null) return;
 		int xpLevels = ExplorersCompassConfig.defaultXpCost;
@@ -303,9 +303,10 @@ public class ExplorersCompassItem extends Item {
 			stack.getNbt().putString("FoundDimension", player.getWorld().getRegistryKey().getValue().toString());
 			stack.getNbt().putInt("Samples", samples);
 			stack.getNbt().putBoolean("DisplayCoordinates", displayCoordinates);
+			stack.getNbt().putBoolean("DisplayDistance", displayDistance);
 		}
 		damageCompass(stack);
-		finishSearch(player, SearchResultPacket.FOUND, 0, structureID, x, z, displayCoordinates);
+		finishSearch(player, SearchResultPacket.FOUND, 0, structureID, x, z, displayCoordinates, displayDistance);
 	}
 
 	public void fail(PlayerEntity player, ItemStack stack, Identifier structureId, int radius, int samples) {
@@ -414,6 +415,12 @@ public class ExplorersCompassItem extends Item {
 		}
 	}
 
+	public void setDisplayDistance(ItemStack stack, boolean displayDistance) {
+		if (ItemUtils.verifyNBT(stack)) {
+			stack.getNbt().putBoolean("DisplayDistance", displayDistance);
+		}
+	}
+
 	public CompassState getState(ItemStack stack) {
 		if (ItemUtils.verifyNBT(stack)) {
 			return CompassState.fromID(stack.getNbt().getInt("State"));
@@ -488,6 +495,14 @@ public class ExplorersCompassItem extends Item {
 		return true;
 	}
 
+	public boolean shouldDisplayDistance(ItemStack stack) {
+		if (ItemUtils.verifyNBT(stack) && stack.getNbt().contains("DisplayDistance")) {
+			return stack.getNbt().getBoolean("DisplayDistance");
+		}
+
+		return shouldDisplayCoordinates(stack);
+	}
+
 	public int getDamage(ItemStack stack) {
 		if (ItemUtils.verifyNBT(stack) && stack.getNbt().contains("CompassDamage")) {
 			return stack.getNbt().getInt("CompassDamage");
@@ -522,6 +537,7 @@ public class ExplorersCompassItem extends Item {
 			stack.getNbt().remove("IsGroup");
 			stack.getNbt().remove("IsListed");
 			stack.getNbt().remove("DisplayCoordinates");
+			stack.getNbt().remove("DisplayDistance");
 			stack.getNbt().remove("SearchRadius");
 			stack.getNbt().remove("Samples");
 		}

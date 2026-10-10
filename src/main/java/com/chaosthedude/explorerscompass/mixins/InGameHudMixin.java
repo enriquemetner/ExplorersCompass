@@ -42,11 +42,17 @@ public class InGameHudMixin {
         RenderUtils.drawConfiguredStringOnHUD(context, StructureUtils.getStructureName(compass.getStructureID(stack)), client.textRenderer, 5, 5, 0xAAAAAA, 1);
         if (!compass.isInFoundDimension(stack, player.getWorld())) {
             RenderUtils.drawConfiguredStringOnHUD(context, "Wrong Dimension", client.textRenderer, 5, 5, 0xFF4444, 3);
-        } else if (compass.shouldDisplayCoordinates(stack)) {
-            RenderUtils.drawConfiguredStringOnHUD(context, "Distance", client.textRenderer, 5, 5, 0xFFFFFF, 3);
-            RenderUtils.drawConfiguredStringOnHUD(context, String.valueOf(StructureUtils.getHorizontalDistanceToLocation(player, compass.getFoundStructureX(stack), compass.getFoundStructureZ(stack))), client.textRenderer, 5, 5, 0xAAAAAA, 4);
-            RenderUtils.drawConfiguredStringOnHUD(context, "Coordinates", client.textRenderer, 5, 5, 0xFFFFFF, 6);
-            RenderUtils.drawConfiguredStringOnHUD(context, compass.getFoundStructureX(stack) + ", " + compass.getFoundStructureZ(stack), client.textRenderer, 5, 5, 0xAAAAAA, 7);
+        } else {
+            int nextLine = 3;
+            if (compass.shouldDisplayDistance(stack)) {
+                RenderUtils.drawConfiguredStringOnHUD(context, "Distance", client.textRenderer, 5, 5, 0xFFFFFF, nextLine++);
+                RenderUtils.drawConfiguredStringOnHUD(context, String.valueOf(StructureUtils.getHorizontalDistanceToLocation(player, compass.getFoundStructureX(stack), compass.getFoundStructureZ(stack))), client.textRenderer, 5, 5, 0xAAAAAA, nextLine++);
+                nextLine++;
+            }
+            if (compass.shouldDisplayCoordinates(stack)) {
+                RenderUtils.drawConfiguredStringOnHUD(context, "Coordinates", client.textRenderer, 5, 5, 0xFFFFFF, nextLine++);
+                RenderUtils.drawConfiguredStringOnHUD(context, compass.getFoundStructureX(stack) + ", " + compass.getFoundStructureZ(stack), client.textRenderer, 5, 5, 0xAAAAAA, nextLine);
+            }
         }
     }
 }

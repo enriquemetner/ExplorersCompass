@@ -160,6 +160,7 @@ public class ExplorersCompassScreen extends Screen {
     private int foundX;
     private int foundZ;
     private boolean showFoundCoordinates;
+    private boolean showFoundDistance;
 	private double filterScroll;
 	private int settingsFirstRow;
 	private enum ScrollPanel { FILTERS, SETTINGS, HIDDEN }
@@ -1403,7 +1404,7 @@ public class ExplorersCompassScreen extends Screen {
         ClientPlayNetworking.send(SearchListedPacket.ID, new SearchListedPacket(eligible, FilterSelections.excludeVisited(), activeRequestId));
     }
 
-    public void onSearchResult(int requestId, int result, int radius, boolean canContinue, Identifier resultId, int foundX, int foundZ, boolean displayCoordinates) {
+    public void onSearchResult(int requestId, int result, int radius, boolean canContinue, Identifier resultId, int foundX, int foundZ, boolean displayCoordinates, boolean displayDistance) {
         if (dialog != Dialog.SEARCHING || activeRequestId != requestId) return;
         if (result == SearchResultPacket.FOUND) {
             if (ExplorersCompassConfig.closeOnFound) {
@@ -1414,6 +1415,7 @@ public class ExplorersCompassScreen extends Screen {
                 this.foundX = foundX;
                 this.foundZ = foundZ;
                 showFoundCoordinates = displayCoordinates;
+                showFoundDistance = displayDistance;
 				double scrollAmount = selectionList.getScrollAmount();
 				selectionList.refreshList(true);
 				selectionList.setScrollAmount(scrollAmount);
@@ -1546,12 +1548,16 @@ public class ExplorersCompassScreen extends Screen {
     }
 
     private Text[] foundLocationLines() {
-        int distance = client.player == null ? 0 : StructureUtils.getHorizontalDistanceToLocation(client.player, foundX, foundZ);
-        return new Text[] {
-            Text.literal("Distance").append(": ").append(Text.literal(Integer.toString(distance)).formatted(Formatting.GRAY)),
-            Text.literal("Coordinates").append(":"),
-            Text.literal(foundX + ", " + foundZ).formatted(Formatting.GRAY)
-        };
+        List<Text> lines = new ArrayList<>();
+        if (showFoundDistance) {
+            int distance = client.player == null ? 0 : StructureUtils.getHorizontalDistanceToLocation(client.player, foundX, foundZ);
+            lines.add(Text.literal("Distance").append(": ").append(Text.literal(Integer.toString(distance)).formatted(Formatting.GRAY)));
+        }
+        if (showFoundCoordinates) {
+            lines.add(Text.literal("Coordinates:"));
+            lines.add(Text.literal(foundX + ", " + foundZ).formatted(Formatting.GRAY));
+        }
+        return lines.toArray(Text[]::new);
     }
 
     private void drawDialogButton(DrawContext context, String label, int x, int y, int w, int mouseX, int mouseY) {
@@ -1641,11 +1647,11 @@ public class ExplorersCompassScreen extends Screen {
             context.drawTexture(texture, x + (w - 16) / 2, y + 10, 16, 16, 0, 0, 16, 16, 16, 16);
             context.drawCenteredTextWithShadow(textRenderer, Text.literal("Structure Located"), x + w / 2, y + 32, 0xffffff);
             Text[] lines = foundInfoLines();
-            Text[] locationLines = showFoundCoordinates ? foundLocationLines() : new Text[0];
+            Text[] locationLines = foundLocationLines();
             int leftWidth = w - 24;
             int rightWidth = 0;
             for (Text line : locationLines) rightWidth = Math.max(rightWidth, textRenderer.getWidth(line));
-            if (showFoundCoordinates) {
+            if (locationLines.length > 0) {
                 int leftWanted = 0;
                 for (Text line : lines) leftWanted = Math.max(leftWanted, textRenderer.getWidth(line));
                 int available = Math.max(2, w - 36);

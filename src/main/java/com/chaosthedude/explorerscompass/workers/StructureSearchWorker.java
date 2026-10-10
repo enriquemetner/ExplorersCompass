@@ -121,7 +121,7 @@ public abstract class StructureSearchWorker<T extends StructurePlacement> implem
 	protected void succeed(BlockPos pos, Structure structure) {
 		ExplorersCompass.LOGGER.info("SearchWorkerManager " + managerId + ": " + getName() + " succeeded with " + (shouldLogRadius() ? getRadius() + " radius, " : "") + samples + " samples");
 		if (!stack.isEmpty() && stack.getItem() == ExplorersCompass.EXPLORERS_COMPASS_ITEM) {
-			((ExplorersCompassItem) stack.getItem()).succeed(player, stack, StructureUtils.getIDForStructure(level, structure), pos.getX(), pos.getZ(), samples, ExplorersCompassConfig.displayCoordinates);
+			((ExplorersCompassItem) stack.getItem()).succeed(player, stack, StructureUtils.getIDForStructure(level, structure), pos.getX(), pos.getZ(), samples, ExplorersCompassConfig.displayCoordinates, ExplorersCompassConfig.displayDistance);
 		} else {
 			ExplorersCompass.LOGGER.error("SearchWorkerManager " + managerId + ": " + getName() + " found invalid compass after successful search");
 		}
