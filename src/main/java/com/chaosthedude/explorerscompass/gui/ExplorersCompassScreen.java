@@ -65,6 +65,9 @@ public class ExplorersCompassScreen extends Screen {
 	private static final int SCROLLBAR_WIDTH = Scrollbar.WIDTH;
 	private static final int SETTINGS_ROW_HEIGHT = 30;
 	private static final int SETTINGS_CONTROL_WIDTH = 90;
+	private static final int SETTINGS_OFFSET_ROW = 2;
+	private static final int SETTINGS_HIDDEN_ROW = 14;
+	private static final int SETTINGS_DIVIDER_COLOR = 0xff909090;
 	private static String sessionSearchText = "";
 	private static final int HIDE_BUTTON_WIDTH = 100;
 	private static final int FOUND_ACTION_BUTTON_WIDTH = 70;
@@ -72,29 +75,37 @@ public class ExplorersCompassScreen extends Screen {
 	private static final int KEEP_SEARCHING_BUTTON_WIDTH = 100;
 	private static final int NOT_FOUND_BUTTON_GAP = 5;
 	private static final String[] SETTINGS_LABELS = {
+		"Overlay",
 		"HUD Side",
 		"HUD Line Offset",
-		"Clear Search Bar on Close",
-		"Clear Filters on Close",
+		"Show While Chat Is Open",
+		"View",
 		"Checked Filters on Top",
 		"Adjust Rows to Fit View",
-		"Close UI when located",
-		"Show While Chat Is Open",
 		"Show Technical Names",
+		"Behavior",
+		"Close UI when located",
+		"Clear Filters on Close",
+		"Clear Search Bar on Close",
 		"Pause Game When Open (Singleplayer)",
+		"Other",
 		"Hidden Structures",
 	};
 	private static final String[] SETTINGS_TOOLTIPS = {
+		null,
 		"Choose whether compass information appears on the left or right side of the HUD.",
 		"Move compass information vertically. Higher values move it down; lower values move it up.",
-		"Clears the search bar when you close the compass screen.",
-		"Clear selected structure filters when you close the compass screen.",
+		"Keep compass information visible while the chat screen is open.",
+		null,
 		"Show checked options above unchecked options in each filter column. The selection itself does not change.",
 		"Adjusts row spacing, showing less content but only fully visible list entries. Smooth scrolling may still show partial entries.",
-		"Close the compass screen when a structure is located.",
-		"Keep compass information visible while the chat screen is open.",
 		"Show structure IDs beside their names and include them in search results.",
+		null,
+		"Close the compass screen when a structure is located.",
+		"Clear selected structure filters when you close the compass screen.",
+		"Clears the search bar when you close the compass screen.",
 		"Pauses singleplayer while the compass screen is open, except while locating a structure.",
+		null,
 		"View and restore structures hidden on this client.",
 	};
 
@@ -847,11 +858,32 @@ public class ExplorersCompassScreen extends Screen {
 		return filterRight() - SETTINGS_CONTROL_WIDTH - 10;
 	}
 
+	private boolean isSettingsDivider(int row) {
+		return SETTINGS_TOOLTIPS[row] == null;
+	}
+
+	private void renderSettingsDivider(DrawContext context, int row) {
+		String title = SETTINGS_LABELS[row];
+		int centerX = (filterLeft() + filterRight()) / 2;
+		int centerY = settingsRowY(row) + SETTINGS_ROW_HEIGHT / 2;
+		int halfTitleWidth = textRenderer.getWidth(title) / 2;
+		int gap = 8;
+		context.fill(filterLeft() + 10, centerY, centerX - halfTitleWidth - gap, centerY + 1, SETTINGS_DIVIDER_COLOR);
+		context.fill(centerX + halfTitleWidth + gap, centerY, filterRight() - 10, centerY + 1, SETTINGS_DIVIDER_COLOR);
+		context.drawText(textRenderer, title, centerX - halfTitleWidth,
+				centerY - textRenderer.fontHeight / 2, SETTINGS_DIVIDER_COLOR, false);
+	}
+
 	private void renderSettingsPanel(DrawContext context) {
+		int lastVisibleRow = Math.min(SETTINGS_LABELS.length, settingsFirstRow + settingsVisibleRows());
 		context.fill(filterLeft(), filterTop(), filterRight(), filterBottom(), 0xb0000000);
 		int labelX = filterLeft() + 10;
 		int labelWidth = Math.max(1, settingsControlX() - labelX - 10);
-		for (int row = settingsFirstRow; row < Math.min(SETTINGS_LABELS.length, settingsFirstRow + settingsVisibleRows()); row++) {
+		for (int row = settingsFirstRow; row < lastVisibleRow; row++) {
+			if (isSettingsDivider(row)) {
+				renderSettingsDivider(context, row);
+				continue;
+			}
 			String label = SETTINGS_LABELS[row];
 			int labelY = settingsRowY(row) + (settingsControlHeight() - textRenderer.fontHeight) / 2;
 			int textWidth = textRenderer.getWidth(label);
@@ -868,10 +900,10 @@ public class ExplorersCompassScreen extends Screen {
 		}
 		String offset = Integer.toString(ExplorersCompassConfig.overlayLineOffset);
 		float offsetScale = Math.min(1.0f, 46.0f / Math.max(1, textRenderer.getWidth(offset)));
-		if (settingsFirstRow <= 1 && 1 < settingsFirstRow + settingsVisibleRows()) {
+		if (settingsFirstRow <= SETTINGS_OFFSET_ROW && SETTINGS_OFFSET_ROW < settingsFirstRow + settingsVisibleRows()) {
 			context.getMatrices().push();
 			context.getMatrices().translate(settingsControlX() + SETTINGS_CONTROL_WIDTH / 2.0,
-					settingsRowY(1) + (settingsControlHeight() - textRenderer.fontHeight * offsetScale) / 2.0, 0);
+					settingsRowY(SETTINGS_OFFSET_ROW) + (settingsControlHeight() - textRenderer.fontHeight * offsetScale) / 2.0, 0);
 			context.getMatrices().scale(offsetScale, offsetScale, 1.0f);
 			context.drawCenteredTextWithShadow(textRenderer, offset, 0, 0, 0xffffff);
 			context.getMatrices().pop();
@@ -884,7 +916,7 @@ public class ExplorersCompassScreen extends Screen {
 			return;
 		}
 		int row = settingsFirstRow + (mouseY - settingsRowY(settingsFirstRow)) / SETTINGS_ROW_HEIGHT;
-		if (row >= SETTINGS_LABELS.length || row >= settingsFirstRow + settingsVisibleRows()) {
+		if (row >= SETTINGS_LABELS.length || row >= settingsFirstRow + settingsVisibleRows() || isSettingsDivider(row)) {
 			return;
 		}
 		int labelX = filterLeft() + 10;
@@ -1848,51 +1880,51 @@ public class ExplorersCompassScreen extends Screen {
 			setSettingsOpen(true);
 		}));
 		int controlX = settingsControlX();
-		overlaySideButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(0), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), (onPress) -> {
+		overlaySideButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(1), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), (onPress) -> {
 			ExplorersCompassConfig.overlaySide = ExplorersCompassConfig.overlaySide == OverlaySide.LEFT ? OverlaySide.RIGHT : OverlaySide.LEFT;
 			ExplorersCompassConfig.saveClient();
 			updateSettingsButtonLabels();
 		}));
-		offsetDecreaseButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(1), 20, settingsControlHeight(), Text.literal("−"), (onPress) -> {
+		offsetDecreaseButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(SETTINGS_OFFSET_ROW), 20, settingsControlHeight(), Text.literal("−"), (onPress) -> {
 			if (ExplorersCompassConfig.overlayLineOffset > Integer.MIN_VALUE) {
 				ExplorersCompassConfig.overlayLineOffset--;
 				ExplorersCompassConfig.saveClient();
 			}
 		}));
-		offsetIncreaseButton = addDrawableChild(new TransparentButton(controlX + SETTINGS_CONTROL_WIDTH - 20, settingsRowY(1), 20, settingsControlHeight(), Text.literal("+"), (onPress) -> {
+		offsetIncreaseButton = addDrawableChild(new TransparentButton(controlX + SETTINGS_CONTROL_WIDTH - 20, settingsRowY(SETTINGS_OFFSET_ROW), 20, settingsControlHeight(), Text.literal("+"), (onPress) -> {
 			if (ExplorersCompassConfig.overlayLineOffset < Integer.MAX_VALUE) {
 				ExplorersCompassConfig.overlayLineOffset++;
 				ExplorersCompassConfig.saveClient();
 			}
 		}));
-		chatOverlayButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(7), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), (onPress) -> {
+		chatOverlayButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(3), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), (onPress) -> {
 			ExplorersCompassConfig.displayWithChatOpen = !ExplorersCompassConfig.displayWithChatOpen;
 			ExplorersCompassConfig.saveClient();
 			updateSettingsButtonLabels();
 		}));
-		clearSearchBarOnCloseButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(2), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), button -> {
+		clearSearchBarOnCloseButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(11), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), button -> {
 			ExplorersCompassConfig.clearSearchBarOnClose = !ExplorersCompassConfig.clearSearchBarOnClose;
 			ExplorersCompassConfig.saveClient();
 			updateSettingsButtonLabels();
 		}));
-		clearOnCloseButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(3), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), (onPress) -> {
+		clearOnCloseButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(10), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), (onPress) -> {
 			ExplorersCompassConfig.clearFiltersOnClose = !ExplorersCompassConfig.clearFiltersOnClose;
 			ExplorersCompassConfig.saveClient();
 			updateSettingsButtonLabels();
 		}));
-		checkedFiltersFirstButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(4), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), (onPress) -> {
+		checkedFiltersFirstButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(5), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), (onPress) -> {
 			ExplorersCompassConfig.checkedFiltersFirst = !ExplorersCompassConfig.checkedFiltersFirst;
 			ExplorersCompassConfig.saveClient();
 			updateSettingsButtonLabels();
 			filterScroll = MathHelper.clamp(filterScroll, 0, filterMaxScroll());
 		}));
-		showTechnicalNamesButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(8), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), button -> {
+		showTechnicalNamesButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(7), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), button -> {
 			ExplorersCompassConfig.showTechnicalNames = !ExplorersCompassConfig.showTechnicalNames;
 			ExplorersCompassConfig.saveClient();
 			updateSettingsButtonLabels();
 			processSearchTerm();
 		}));
-		adjustRowsToFitViewButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(5), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), (onPress) -> {
+		adjustRowsToFitViewButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(6), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), (onPress) -> {
 			Identifier selectedId = selectionList.hasSelection() ? selectionList.getSelectedOrNull().getStructureID() : null;
 			ExplorersCompassConfig.adjustRowsToFitView = !ExplorersCompassConfig.adjustRowsToFitView;
 			ExplorersCompassConfig.saveClient();
@@ -1901,18 +1933,18 @@ public class ExplorersCompassScreen extends Screen {
 			filterScroll = MathHelper.clamp(filterScroll, 0, filterMaxScroll());
 			updateSettingsButtonLabels();
 		}));
-		closeOnFoundButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(6), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), button -> {
+		closeOnFoundButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(9), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), button -> {
 			ExplorersCompassConfig.closeOnFound = !ExplorersCompassConfig.closeOnFound;
 			ExplorersCompassConfig.saveClient();
 			updateSettingsButtonLabels();
 		}));
-		pauseGameWhenOpenButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(9), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), button -> {
+		pauseGameWhenOpenButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(12), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.empty(), button -> {
 			ExplorersCompassConfig.pauseGameWhenOpen = !ExplorersCompassConfig.pauseGameWhenOpen;
 			ExplorersCompassConfig.saveClient();
 			updateSettingsButtonLabels();
 		}));
 		updateSettingsButtonLabels();
-        hiddenStructuresButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(10), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.literal("Open"), button -> {
+        hiddenStructuresButton = addDrawableChild(new TransparentButton(controlX, settingsRowY(SETTINGS_HIDDEN_ROW), SETTINGS_CONTROL_WIDTH, settingsControlHeight(), Text.literal("Open"), button -> {
             settingsOpen = false;
             hiddenStructuresOpen = true;
             hiddenScroll = 0;
@@ -2035,7 +2067,7 @@ public class ExplorersCompassScreen extends Screen {
 		cancelButton.setX(width - 30);
 		settingsButton.setY(height - 30);
         hiddenStructuresButton.setX(settingsControlX());
-        hiddenStructuresButton.setY(settingsRowY(10));
+        hiddenStructuresButton.setY(settingsRowY(SETTINGS_HIDDEN_ROW));
 		if (width >= 480) {
 			teleportButton.setX(cancelButton.getX() - teleportButton.getWidth() - 5);
 			teleportButton.setY(10);
@@ -2072,18 +2104,18 @@ public class ExplorersCompassScreen extends Screen {
 		excludeVisitedButton.visible = filtersOpen && ExplorersCompass.canExcludeVisited;
 		backButton.visible = filtersOpen || settingsOpen || hiddenStructuresOpen;
 		if (hiddenSearchTextField != null) hiddenSearchTextField.setVisible(hiddenStructuresOpen);
-		placeSetting(overlaySideButton, 0);
-		placeSetting(offsetDecreaseButton, 1);
-		placeSetting(offsetIncreaseButton, 1);
-		placeSetting(clearSearchBarOnCloseButton, 2);
-		placeSetting(clearOnCloseButton, 3);
-		placeSetting(checkedFiltersFirstButton, 4);
-		placeSetting(adjustRowsToFitViewButton, 5);
-		placeSetting(closeOnFoundButton, 6);
-		placeSetting(chatOverlayButton, 7);
-		placeSetting(showTechnicalNamesButton, 8);
-		placeSetting(pauseGameWhenOpenButton, 9);
-		placeSetting(hiddenStructuresButton, 10);
+		placeSetting(overlaySideButton, 1);
+		placeSetting(offsetDecreaseButton, SETTINGS_OFFSET_ROW);
+		placeSetting(offsetIncreaseButton, SETTINGS_OFFSET_ROW);
+		placeSetting(chatOverlayButton, 3);
+		placeSetting(checkedFiltersFirstButton, 5);
+		placeSetting(adjustRowsToFitViewButton, 6);
+		placeSetting(showTechnicalNamesButton, 7);
+		placeSetting(closeOnFoundButton, 9);
+		placeSetting(clearOnCloseButton, 10);
+		placeSetting(clearSearchBarOnCloseButton, 11);
+		placeSetting(pauseGameWhenOpenButton, 12);
+		placeSetting(hiddenStructuresButton, SETTINGS_HIDDEN_ROW);
 	}
 
 	private void placeSetting(ButtonWidget button, int row) {

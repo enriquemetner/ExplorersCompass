@@ -9,11 +9,14 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 
 import com.chaosthedude.explorerscompass.ExplorersCompass;
 import com.chaosthedude.explorerscompass.util.OverlaySide;
 import com.electronwill.nightconfig.core.CommentedConfig;
+import com.electronwill.nightconfig.core.io.ParsingMode;
+import com.electronwill.nightconfig.toml.TomlFormat;
 import com.electronwill.nightconfig.toml.TomlParser;
 import com.electronwill.nightconfig.toml.TomlWriter;
 
@@ -82,7 +85,7 @@ public class ExplorersCompassConfig {
 	private static CommentedConfig readOrCreate(String name) throws IOException {
 		Path path = directory().resolve(name);
 		if (Files.exists(path)) return parse(path);
-		CommentedConfig config = CommentedConfig.inMemory();
+		CommentedConfig config = TomlFormat.newConfig(LinkedHashMap::new);
 		switch (name) {
 			case COMMON -> writeCommon(config);
 			case CLIENT -> writeClient(config);
@@ -96,7 +99,9 @@ public class ExplorersCompassConfig {
 
 	private static CommentedConfig parse(Path path) throws IOException {
 		try (Reader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
-			return new TomlParser().parse(reader);
+			CommentedConfig config = TomlFormat.newConfig(LinkedHashMap::new);
+			new TomlParser().parse(reader, config, ParsingMode.MERGE);
+			return config;
 		} catch (RuntimeException e) {
 			throw new IllegalArgumentException("Invalid TOML in " + path, e);
 		}
@@ -170,8 +175,8 @@ public class ExplorersCompassConfig {
 				throw bad("overlay.overlaySide", "LEFT or RIGHT");
 			}
 		}
-		List<String> order = strings(config, "view.sortOrder", sortOrder);
-		if (!normalizeSortOrder(order).equals(order)) throw bad("view.sortOrder", "permutation of NAME, SOURCE, DIMENSION, GROUP");
+		List<String> order = strings(config, "sorting.sortOrder", sortOrder);
+		if (!normalizeSortOrder(order).equals(order)) throw bad("sorting.sortOrder", "permutation of NAME, SOURCE, DIMENSION, GROUP");
 		sortOrder = order;
 	}
 
@@ -192,17 +197,17 @@ public class ExplorersCompassConfig {
 	}
 
 	private static void writeClient(CommentedConfig config) {
+		put(config, "overlay.overlaySide", overlaySide.name(), "HUD overlay side: LEFT or RIGHT.");
+		put(config, "overlay.overlayLineOffset", overlayLineOffset, "Vertical line offset of the HUD overlay.");
 		put(config, "overlay.displayWithChatOpen", displayWithChatOpen, "Show compass information while chat is open.");
-		put(config, "behavior.pauseGameWhenOpen", pauseGameWhenOpen, "Pause single-player while the compass screen is open.");
-		put(config, "behavior.clearFiltersOnClose", clearFiltersOnClose, "Clear filters when the compass screen closes.");
-		put(config, "behavior.clearSearchBarOnClose", clearSearchBarOnClose, "Clear the search bar when the compass screen closes.");
-		put(config, "behavior.closeOnFound", closeOnFound, "Close the compass screen after finding a structure.");
 		put(config, "view.checkedFiltersFirst", checkedFiltersFirst, "Show checked filters before unchecked filters.");
 		put(config, "view.adjustRowsToFitView", adjustRowsToFitView, "Adjust row spacing so list entries fit the view.");
 		put(config, "view.showTechnicalNames", showTechnicalNames, "Show and search technical structure IDs.");
-		put(config, "overlay.overlayLineOffset", overlayLineOffset, "Vertical line offset of the HUD overlay.");
-		put(config, "overlay.overlaySide", overlaySide.name(), "HUD overlay side: LEFT or RIGHT.");
-		put(config, "view.sortOrder", sortOrder, "Order of the four structure sorting keys.");
+		put(config, "behavior.closeOnFound", closeOnFound, "Close the compass screen after finding a structure.");
+		put(config, "behavior.clearFiltersOnClose", clearFiltersOnClose, "Clear filters when the compass screen closes.");
+		put(config, "behavior.clearSearchBarOnClose", clearSearchBarOnClose, "Clear the search bar when the compass screen closes.");
+		put(config, "behavior.pauseGameWhenOpen", pauseGameWhenOpen, "Pause single-player while the compass screen is open.");
+		put(config, "sorting.sortOrder", sortOrder, "Order of the four structure sorting keys.");
 	}
 
 	private static void writeCommonBlacklist(CommentedConfig config) {
@@ -216,7 +221,7 @@ public class ExplorersCompassConfig {
 	private static void saveFile(String name, java.util.function.Consumer<CommentedConfig> update) {
 		try {
 			Path path = directory().resolve(name);
-			CommentedConfig config = Files.exists(path) ? parse(path) : CommentedConfig.inMemory();
+			CommentedConfig config = Files.exists(path) ? parse(path) : TomlFormat.newConfig(LinkedHashMap::new);
 			update.accept(config);
 			write(path, config);
 		} catch (IOException e) {
