@@ -2010,7 +2010,10 @@ public class ExplorersCompassScreen extends Screen {
 		int availableWidth = Math.max(0, rightButtonX - searchX - SEARCH_TELEPORT_GAP);
 		searchTextField = new TransparentTextField(textRenderer, searchX, 10, Math.min(SEARCH_FIELD_WIDTH, availableWidth), 20, Text.literal("Search"));
 		searchTextField.setText(sessionSearchText);
-		searchTextField.setChangedListener(value -> processSearchTerm());
+		searchTextField.setChangedListener(value -> {
+			selectionList.setSelected(null);
+			processSearchTerm();
+		});
 		addDrawableChild(searchTextField);
 		searchTextField.setVisible(isStructureView());
 		int filterSearchX = filterSearchX();
