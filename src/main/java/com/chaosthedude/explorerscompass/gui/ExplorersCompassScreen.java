@@ -61,7 +61,9 @@ public class ExplorersCompassScreen extends Screen {
 	private static final int FILTER_TITLE_X = 16;
 	private static final int FILTER_TITLE_GAP = 16;
 	private static final int BUTTON_CROSS_SIZE = 7;
-	private static final int HEADER_BUTTON_TEXT_PADDING = 32;
+	private static final int HEADER_BUTTON_TEXT_PADDING = 20;
+	private static final int EXCLUDE_VISITED_CONTENT_PADDING = HEADER_BUTTON_TEXT_PADDING / 2;
+	private static final int EXCLUDE_VISITED_TEXT_CHECKBOX_GAP = 5;
 	private static final int SCROLLBAR_WIDTH = Scrollbar.WIDTH;
 	private static final int SETTINGS_ROW_HEIGHT = 30;
 	private static final int SETTINGS_CONTROL_WIDTH = 90;
@@ -344,9 +346,10 @@ public class ExplorersCompassScreen extends Screen {
 		}
 		super.render(context, mouseX, mouseY, partialTicks);
 		if (excludeVisitedButton.visible) {
-			drawFilterCheckbox(context, excludeVisitedButton.getX() + excludeVisitedButton.getWidth() - FILTER_CHECKBOX_SIZE - 7,
+			drawFilterCheckbox(context, excludeVisitedButton.getX() + excludeVisitedButton.getWidth() - FILTER_CHECKBOX_SIZE - EXCLUDE_VISITED_CONTENT_PADDING,
 				excludeVisitedButton.getY() + (excludeVisitedButton.getHeight() - FILTER_CHECKBOX_SIZE) / 2, FilterSelections.excludeVisited());
-			if (textRenderer.getWidth("Exclude Visited") > excludeVisitedButton.getWidth() - FILTER_CHECKBOX_SIZE - 18
+			if (textRenderer.getWidth("Exclude Visited") > excludeVisitedButton.getWidth() - EXCLUDE_VISITED_CONTENT_PADDING * 2
+					- FILTER_CHECKBOX_SIZE - EXCLUDE_VISITED_TEXT_CHECKBOX_GAP
 					&& excludeVisitedButton.isHovered()) {
 				context.drawTooltip(textRenderer, Text.literal("Exclude Visited"), mouseX, mouseY);
 			}
@@ -1969,10 +1972,10 @@ public class ExplorersCompassScreen extends Screen {
 			filterScroll = MathHelper.clamp(filterScroll, 0, filterMaxScroll());
 		}));
 		TransparentButton excludeButton = addDrawableChild(new TransparentButton(10, 10,
-				buttonWidthForLabel("Exclude Visited") + FILTER_CHECKBOX_SIZE + 10, 20, Text.literal("Exclude Visited"), button -> {
+				excludeVisitedButtonWidth(), 20, Text.literal("Exclude Visited"), button -> {
 			FilterSelections.toggleExcludeVisited();
 		}));
-		excludeButton.setRightInset(FILTER_CHECKBOX_SIZE + 10);
+		excludeButton.setRightInset(FILTER_CHECKBOX_SIZE + EXCLUDE_VISITED_TEXT_CHECKBOX_GAP);
 		excludeVisitedButton = excludeButton;
 		backButton = addDrawableChild(new TransparentButton(10, 10, buttonWidthForLabel("Back"), 20, Text.literal("Back"), (onPress) -> {
             if (hiddenStructuresOpen) {
@@ -2041,6 +2044,11 @@ public class ExplorersCompassScreen extends Screen {
 		return textRenderer.getWidth(label) + HEADER_BUTTON_TEXT_PADDING;
 	}
 
+	private int excludeVisitedButtonWidth() {
+		return textRenderer.getWidth("Exclude Visited") + FILTER_CHECKBOX_SIZE
+				+ EXCLUDE_VISITED_TEXT_CHECKBOX_GAP + EXCLUDE_VISITED_CONTENT_PADDING * 2;
+	}
+
 	private int filterSearchX() {
 		return FILTER_TITLE_X + textRenderer.getWidth(Text.literal("Filters")) + FILTER_TITLE_GAP;
 	}
@@ -2048,7 +2056,7 @@ public class ExplorersCompassScreen extends Screen {
 	private boolean wrapsFilterSearch() {
 		if (!ExplorersCompass.canExcludeVisited) return false;
 		int buttonsStart = width - 45 - buttonWidthForLabel("Back") - buttonWidthForLabel("Clear Filters")
-				- buttonWidthForLabel("Exclude Visited") - FILTER_CHECKBOX_SIZE - 10;
+				- excludeVisitedButtonWidth();
 		int searchX = filterSearchX();
 		return buttonsStart - searchX - SEARCH_TELEPORT_GAP < 50;
 	}

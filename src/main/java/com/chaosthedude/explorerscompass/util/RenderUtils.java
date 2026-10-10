@@ -12,7 +12,7 @@ import net.minecraft.client.gui.DrawContext;
 public class RenderUtils {
 	public static final int NORMAL_BACKGROUND_OPACITY_PERCENT = 50;
 	public static final int HIGHLIGHTED_BACKGROUND_OPACITY_PERCENT = 75;
-	public static final int LOCKED_ENTRY_BACKGROUND_OPACITY_PERCENT = 75;
+	public static final int LOCKED_ENTRY_BACKGROUND_OPACITY_PERCENT = 65;
 	public static final int DISABLED_BUTTON_OPACITY_PERCENT = 20;
 	public static final int SEARCH_FIELD_OPACITY_PERCENT = 25;
 	public static final int SCROLLBAR_THUMB_OPACITY_PERCENT = 80;
