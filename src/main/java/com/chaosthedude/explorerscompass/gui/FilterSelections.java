@@ -15,6 +15,7 @@ public final class FilterSelections {
 	public static final Set<Identifier> groups = new HashSet<>();
 	private static boolean currentSelected;
 	private static boolean excludeVisited;
+	private static boolean excludeLocked;
 	private static Identifier currentDimension;
 
 	private FilterSelections() {
@@ -26,10 +27,11 @@ public final class FilterSelections {
 		groups.clear();
 		currentSelected = false;
 		excludeVisited = false;
+		excludeLocked = false;
 	}
 
 	public static boolean isEmpty() {
-		return sources.isEmpty() && dimensions.isEmpty() && groups.isEmpty() && !excludeVisited;
+		return sources.isEmpty() && dimensions.isEmpty() && groups.isEmpty() && !excludeVisited && !excludeLocked;
 	}
 
 	public static boolean excludeVisited() {
@@ -38,6 +40,14 @@ public final class FilterSelections {
 
 	public static void toggleExcludeVisited() {
 		excludeVisited = !excludeVisited;
+	}
+
+	public static boolean excludeLocked() {
+		return excludeLocked;
+	}
+
+	public static void toggleExcludeLocked() {
+		excludeLocked = !excludeLocked;
 	}
 
 	public static boolean isCurrentSelected() {
