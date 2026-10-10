@@ -40,7 +40,9 @@ final class LockedRequirementsView {
         lineHeight = renderer.fontHeight + 3;
         lines = new ArrayList<>();
         addNode(requirements, 0, false);
-        bodyHeight = Math.max(1, Math.min(Math.min(screenHeight / 2, Math.max(1, screenHeight - 70)), lines.size() * lineHeight));
+        // Include the title, Back button, spacing, and border in the half-screen limit.
+        int maxBodyHeight = Math.max(1, screenHeight / 2 - 67);
+        bodyHeight = Math.max(1, Math.min(maxBodyHeight, lines.size() * lineHeight));
         x = (screenWidth - width) / 2;
         y = (screenHeight - bodyHeight - 65) / 2;
         scroll = MathHelper.clamp(scroll, 0, maxScroll());

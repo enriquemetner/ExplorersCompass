@@ -2,6 +2,7 @@ package com.chaosthedude.explorerscompass.gui;
 
 import com.chaosthedude.explorerscompass.ExplorersCompass;
 import com.chaosthedude.explorerscompass.config.ExplorersCompassConfig;
+import com.chaosthedude.explorerscompass.util.RenderUtils;
 import com.chaosthedude.explorerscompass.util.StructureUtils;
 import com.mojang.blaze3d.systems.RenderSystem;
 
@@ -38,8 +39,9 @@ public class StructureSearchEntry extends AlwaysSelectedEntryListWidget.Entry<St
         int nameColor = !locked ? 0xffffff : 0xc0c0c0;
         int infoColor = !locked ? 0x808080 : 0x707070;
         int buttonWidth = parentScreen.rowActionButtonWidth();
-        int buttonX = left + width - buttonWidth - 8;
-        int buttonY = top + (height - 42) / 2;
+        int buttonX = left + width - buttonWidth - 7;
+        int buttonHeight = StructureSearchList.ACTION_BUTTON_HEIGHT;
+        int buttonY = top + (height - (buttonHeight * 2 + StructureSearchList.ACTION_BUTTON_GAP)) / 2;
         int textWidth = Math.max(1, buttonX - left - 10);
         String readableName = StructureUtils.getStructureName(structureID);
         int nameY = top + (height / 2) - ((client.textRenderer.fontHeight + 2) * 2);
@@ -65,18 +67,17 @@ public class StructureSearchEntry extends AlwaysSelectedEntryListWidget.Entry<St
         context.drawText(client.textRenderer, client.textRenderer.trimToWidth(Text.literal("Group").getString() + ": " + StructureUtils.getStructureName(ExplorersCompass.structureIDsToGroupIDs.get(structureID)), textWidth), left + 5, top + (height / 2) - ((client.textRenderer.fontHeight + 2) * 0), infoColor, true);
         context.drawText(client.textRenderer, client.textRenderer.trimToWidth(Text.literal("Dimension").getString() + ": " + StructureUtils.structureDimensionsToString(ExplorersCompass.allowedStructureIDsToDimensionIDs.get(structureID)), textWidth), left + 5, top + (height / 2) + ((client.textRenderer.fontHeight + 2) * 1), infoColor, true);
         boolean filterHovered = structuresList.isFilterButtonClick(this, mouseX, mouseY);
-        context.fill(buttonX, buttonY, buttonX + buttonWidth, buttonY + 20, 0xff909090);
-        context.fill(buttonX + 1, buttonY + 1, buttonX + buttonWidth - 1, buttonY + 19, filterHovered ? 0xff424242 : 0xff242424);
-        context.drawCenteredTextWithShadow(client.textRenderer, Text.literal("filters"), buttonX + buttonWidth / 2, buttonY + 6, 0xffffff);
-        buttonY += 22;
+        context.fill(buttonX, buttonY, buttonX + buttonWidth, buttonY + buttonHeight, 0xff909090);
+        context.fill(buttonX + 1, buttonY + 1, buttonX + buttonWidth - 1, buttonY + buttonHeight - 1, filterHovered ? 0xff424242 : 0xff242424);
+        context.drawCenteredTextWithShadow(client.textRenderer, Text.literal("filters"), buttonX + buttonWidth / 2, buttonY + 4, 0xffffff);
+        buttonY += buttonHeight + StructureSearchList.ACTION_BUTTON_GAP;
         boolean buttonHovered = structuresList.isActionButtonClick(this, mouseX, mouseY);
-        context.fill(buttonX, buttonY, buttonX + buttonWidth, buttonY + 20, 0xff909090);
-        context.fill(buttonX + 1, buttonY + 1, buttonX + buttonWidth - 1, buttonY + 19, buttonHovered ? 0xff424242 : 0xff242424);
+        context.fill(buttonX, buttonY, buttonX + buttonWidth, buttonY + buttonHeight, 0xff909090);
+        context.fill(buttonX + 1, buttonY + 1, buttonX + buttonWidth - 1, buttonY + buttonHeight - 1, buttonHovered ? 0xff424242 : 0xff242424);
         context.drawCenteredTextWithShadow(client.textRenderer, Text.literal(parentScreen.isStructureHidden(structureID)
-                ? "Undo" : "hide"), buttonX + buttonWidth / 2, buttonY + 6, 0xffffff);
-        if (locked) {
-            context.fill(left, top, left + width, top + height, 0x33000000);
-            context.drawCenteredTextWithShadow(client.textRenderer, Text.literal("Locked"),
+                ? "Undo" : "hide"), buttonX + buttonWidth / 2, buttonY + 4, 0xffffff);
+		if (locked) {
+			context.drawCenteredTextWithShadow(client.textRenderer, Text.literal("Locked"),
                     left + width / 2, top + (height - client.textRenderer.fontHeight) / 2, 0xffffff);
         }
         RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);

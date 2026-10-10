@@ -1,5 +1,6 @@
 package com.chaosthedude.explorerscompass.gui;
 
+import com.chaosthedude.explorerscompass.util.RenderUtils;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.MinecraftClient;
@@ -23,16 +24,10 @@ public class TransparentButton extends ButtonWidget {
 	public void renderButton(DrawContext context, int mouseX, int mouseY, float partialTicks) {
 		if (visible) {
 			MinecraftClient mc = MinecraftClient.getInstance();
-			float state = 2;
-			if (!active) {
-				state = 5;
-			} else if (isHovered()) {
-				state = 4;
-			}
-			final float f = state / 2 * 0.9F + 0.1F;
-			final int color = (int) (255.0F * f);	
-
-			context.fill(getX(), getY(), getX() + getWidth(), getY() + getHeight(), color / 2 << 24);
+			int opacity = !active ? RenderUtils.DISABLED_BUTTON_OPACITY_PERCENT
+					: isHovered() ? RenderUtils.HIGHLIGHTED_BACKGROUND_OPACITY_PERCENT
+					: RenderUtils.NORMAL_BACKGROUND_OPACITY_PERCENT;
+			context.fill(getX(), getY(), getX() + getWidth(), getY() + getHeight(), RenderUtils.blackWithOpacity(opacity));
 			String label = getMessage().getString();
 			int availableWidth = Math.max(1, getWidth() - rightInset - 8);
 			if (mc.textRenderer.getWidth(label) > availableWidth) {

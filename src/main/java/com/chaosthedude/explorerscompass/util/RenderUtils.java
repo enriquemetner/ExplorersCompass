@@ -10,8 +10,19 @@ import net.minecraft.client.gui.DrawContext;
 
 @Environment(EnvType.CLIENT)
 public class RenderUtils {
+	public static final int NORMAL_BACKGROUND_OPACITY_PERCENT = 50;
+	public static final int HIGHLIGHTED_BACKGROUND_OPACITY_PERCENT = 75;
+	public static final int LOCKED_ENTRY_BACKGROUND_OPACITY_PERCENT = 75;
+	public static final int DISABLED_BUTTON_OPACITY_PERCENT = 20;
+	public static final int SEARCH_FIELD_OPACITY_PERCENT = 25;
+	public static final int SCROLLBAR_THUMB_OPACITY_PERCENT = 80;
 	
 	public static final MinecraftClient mc = MinecraftClient.getInstance();
+
+	public static int blackWithOpacity(int percent) {
+		if (percent < 0 || percent > 100) throw new IllegalArgumentException("Opacity must be between 0 and 100 percent");
+		return Math.round(percent * 255.0f / 100.0f) << 24;
+	}
 
 	public static void drawStringLeft(DrawContext context, String string, TextRenderer textRenderer, int x, int y, int color) {
 		context.drawTextWithShadow(textRenderer, string, x, y, color);
@@ -31,23 +42,25 @@ public class RenderUtils {
 	}
 
 	public static void drawScrollbarThumb(DrawContext context, int x, int y, int width, int height, int color) {
-		if (width < 6 || height < 6) {
+		if (width < 6 || height < 7) {
 			context.fill(x, y, x + width, y + height, color);
 			return;
 		}
-		int firstLineY = y + (height - 4) / 2;
-		int secondLineY = firstLineY + 3;
-		context.fill(x, y, x + width, firstLineY, color);
-		context.fill(x, firstLineY + 1, x + width, secondLineY, color);
-		context.fill(x, secondLineY + 1, x + width, y + height, color);
-		drawDotRow(context, x, firstLineY, width, color);
-		drawDotRow(context, x, secondLineY, width, color);
+		int firstDotY = y + (height - 7) / 2;
+		int fillFrom = y;
+		for (int row = 0; row < 3; row++) {
+			int dotY = firstDotY + row * 3;
+			context.fill(x, fillFrom, x + width, dotY, color);
+			drawDotRow(context, x, dotY, width, color);
+			fillFrom = dotY + 1;
+		}
+		context.fill(x, fillFrom, x + width, y + height, color);
 	}
 
 	private static void drawDotRow(DrawContext context, int x, int y, int width, int color) {
-		// Half-pixel horizontal coordinates keep the closer pair distinct and centered on a 6px thumb.
-		int firstDot = 3;
-		int secondDot = width * 2 - firstDot - 2;
+		// Half-pixel coordinates keep the pair distinct and centered at any thumb width.
+		int firstDot = width - 4;
+		int secondDot = width + 2;
 		context.getMatrices().push();
 		context.getMatrices().translate(x, 0, 0);
 		context.getMatrices().scale(0.5f, 1.0f, 1.0f);
@@ -56,17 +69,5 @@ public class RenderUtils {
 		context.fill(secondDot + 2, y, width * 2, y + 1, color);
 		context.getMatrices().pop();
 	}
-
-    public static int getBackgroundColor(boolean active, boolean hovered) {
-        float state = 2;
-        if (!active) {
-            state = 5;
-        } else if (hovered) {
-            state = 3;
-        }
-        final float f = state / 2 * 0.9F + 0.1F;
-        final int color = (int) (255.0F * f);
-        return color / 2 << 24;
-    }
 
 }

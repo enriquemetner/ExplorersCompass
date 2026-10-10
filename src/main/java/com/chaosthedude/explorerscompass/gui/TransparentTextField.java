@@ -1,5 +1,6 @@
 package com.chaosthedude.explorerscompass.gui;
 
+import com.chaosthedude.explorerscompass.util.RenderUtils;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.font.TextRenderer;
@@ -35,8 +36,8 @@ public class TransparentTextField extends TextFieldWidget {
 	public void render(DrawContext context, int mouseX, int mouseY, float partialTicks) {
 		if (isVisible()) {
 			if (pseudoEnableBackgroundDrawing) {
-				final int color = (int) (255.0F * 0.55f);
-				context.fill(getX(), getY(), getX() + getWidth(), getY() + getHeight(), color / 2 << 24);
+				context.fill(getX(), getY(), getX() + getWidth(), getY() + getHeight(),
+						RenderUtils.blackWithOpacity(RenderUtils.SEARCH_FIELD_OPACITY_PERCENT));
 			}
 			boolean showLabel = !isFocused() && getText().isEmpty();
             int i = showLabel ? labelColor : (pseudoEditable ? pseudoEditableColor : pseudoUneditableColor);

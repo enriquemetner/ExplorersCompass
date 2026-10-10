@@ -5,9 +5,10 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.util.math.MathHelper;
 
 final class Scrollbar {
-	static final int WIDTH = 6;
+	static final int WIDTH = 10;
 	static final int GRAB_PADDING = 2;
 	private final int x;
+	private final int width;
 	private final int top;
 	private final int bottom;
 	private final int thumbHeight;
@@ -15,7 +16,12 @@ final class Scrollbar {
 	private final double maxOffset;
 
 	Scrollbar(int x, int top, int bottom, int thumbHeight, double offset, double maxOffset) {
+		this(x, WIDTH, top, bottom, thumbHeight, offset, maxOffset);
+	}
+
+	Scrollbar(int x, int width, int top, int bottom, int thumbHeight, double offset, double maxOffset) {
 		this.x = x;
+		this.width = width;
 		this.top = top;
 		this.bottom = bottom;
 		this.thumbHeight = MathHelper.clamp(thumbHeight, 1, Math.max(1, bottom - top));
@@ -50,7 +56,7 @@ final class Scrollbar {
 	}
 
 	boolean contains(double mouseX, double mouseY) {
-		return isVisible() && mouseX >= x && mouseX < x + WIDTH && mouseY >= top && mouseY < bottom;
+		return isVisible() && mouseX >= x && mouseX < x + width && mouseY >= top && mouseY < bottom;
 	}
 
 	int thumbTop() {
@@ -71,12 +77,14 @@ final class Scrollbar {
 	}
 
 	void render(DrawContext context) {
-		render(context, RenderUtils.getBackgroundColor(false, false), RenderUtils.getBackgroundColor(true, true));
+		if (!isVisible()) return;
+		RenderUtils.drawScrollbarThumb(context, x, thumbTop(), width, thumbHeight,
+				RenderUtils.blackWithOpacity(RenderUtils.SCROLLBAR_THUMB_OPACITY_PERCENT));
 	}
 
 	void render(DrawContext context, int trackColor, int thumbColor) {
 		if (!isVisible()) return;
-		context.fill(x, top, x + WIDTH, bottom, trackColor);
-		RenderUtils.drawScrollbarThumb(context, x, thumbTop(), WIDTH, thumbHeight, thumbColor);
+		context.fill(x, top, x + width, bottom, trackColor);
+		RenderUtils.drawScrollbarThumb(context, x, thumbTop(), width, thumbHeight, thumbColor);
 	}
 }

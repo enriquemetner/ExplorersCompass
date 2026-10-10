@@ -275,7 +275,7 @@ public class ExplorersCompassScreen extends Screen {
 		if (searchTextField != null) sessionSearchText = searchTextField.getText();
 		clearChildren();
 		setupButtons();
-		selectionList = new StructureSearchList(this, client, player, null, 130, 40, width - 130 - SCROLLBAR_WIDTH, height - 50, 50);
+		selectionList = new StructureSearchList(this, client, player, null, 130, 40, width - 130 - StructureSearchList.SCROLLBAR_WIDTH, height - 50, 50);
 		if (isStructureView()) {
 			addDrawableChild(selectionList);
 		}
@@ -313,7 +313,7 @@ public class ExplorersCompassScreen extends Screen {
 			remove(selectionList);
 			allowedStructureIDs = new ArrayList<Identifier>(ExplorersCompass.allowedStructureIDs);
 			structureIDsMatchingSearch = new ArrayList<Identifier>(allowedStructureIDs);
-			selectionList = new StructureSearchList(this, client, player, null, 130, 40, width - 130 - SCROLLBAR_WIDTH, height - 50, 50);
+			selectionList = new StructureSearchList(this, client, player, null, 130, 40, width - 130 - StructureSearchList.SCROLLBAR_WIDTH, height - 50, 50);
 			if (isStructureView()) {
 				addDrawableChild(selectionList);
 			}
@@ -876,7 +876,8 @@ public class ExplorersCompassScreen extends Screen {
 
 	private void renderSettingsPanel(DrawContext context) {
 		int lastVisibleRow = Math.min(SETTINGS_LABELS.length, settingsFirstRow + settingsVisibleRows());
-		context.fill(filterLeft(), filterTop(), filterRight(), filterBottom(), 0xb0000000);
+		context.fill(filterLeft(), filterTop(), filterRight(), filterBottom(),
+				RenderUtils.blackWithOpacity(RenderUtils.NORMAL_BACKGROUND_OPACITY_PERCENT));
 		int labelX = filterLeft() + 10;
 		int labelWidth = Math.max(1, settingsControlX() - labelX - 10);
 		for (int row = settingsFirstRow; row < lastVisibleRow; row++) {
@@ -962,18 +963,19 @@ public class ExplorersCompassScreen extends Screen {
 		filterScroll = MathHelper.clamp(filterScroll, 0, filterMaxScroll());
 		int right = filterRight();
 		int bottom = filterBottom();
+		int backgroundColor = RenderUtils.blackWithOpacity(RenderUtils.NORMAL_BACKGROUND_OPACITY_PERCENT);
 		for (int column = showSourceColumn ? 0 : 1; column < 3; column++) {
 			int columnLeft = filterColumnLeft(column);
 			int columnRight = filterColumnRight(column);
-			context.fill(columnLeft, filterTop(), columnRight, filterRowsTop() - FILTER_HEADER_GAP, 0xb0000000);
+			context.fill(columnLeft, filterTop(), columnRight, filterRowsTop() - FILTER_HEADER_GAP, backgroundColor);
 			List<FilterOption> options = visibleFilterOptions(column);
 			int sectionStart = filterSectionStart(column, options);
 			if (sectionStart >= 0) {
 				int gapY = filterRowsTop() + sectionStart * filterRowHeight() - visibleFilterScroll();
-				context.fill(columnLeft, filterRowsTop(), columnRight, MathHelper.clamp(gapY, filterRowsTop(), bottom), 0xb0000000);
-				context.fill(columnLeft, MathHelper.clamp(gapY + FILTER_SECTION_GAP, filterRowsTop(), bottom), columnRight, bottom, 0xb0000000);
+				context.fill(columnLeft, filterRowsTop(), columnRight, MathHelper.clamp(gapY, filterRowsTop(), bottom), backgroundColor);
+				context.fill(columnLeft, MathHelper.clamp(gapY + FILTER_SECTION_GAP, filterRowsTop(), bottom), columnRight, bottom, backgroundColor);
 			} else {
-				context.fill(columnLeft, filterRowsTop(), columnRight, bottom, 0xb0000000);
+				context.fill(columnLeft, filterRowsTop(), columnRight, bottom, backgroundColor);
 			}
 		}
 		String[] headings = {
@@ -1752,7 +1754,8 @@ public class ExplorersCompassScreen extends Screen {
 	}
 
     private void renderHiddenStructures(DrawContext context, int mouseX, int mouseY) {
-        context.fill(filterLeft(), filterTop(), filterRight(), filterBottom(), 0xb0000000);
+        context.fill(filterLeft(), filterTop(), filterRight(), filterBottom(),
+				RenderUtils.blackWithOpacity(RenderUtils.NORMAL_BACKGROUND_OPACITY_PERCENT));
         List<String> ids = filteredHiddenStructures();
         hiddenScroll = MathHelper.clamp(hiddenScroll, 0, Math.max(0, ids.size() - hiddenVisibleRows()));
         context.enableScissor(filterLeft(), filterTop(), filterRight(), filterBottom());
@@ -1789,7 +1792,7 @@ public class ExplorersCompassScreen extends Screen {
 	}
 
 	public int rowActionButtonWidth() {
-		return textRenderer.getWidth(Text.literal("filters")) + 6;
+		return textRenderer.getWidth(Text.literal("filters")) + 8;
 	}
 
 	public void toggleStructureHidden(Identifier id) {
@@ -1929,7 +1932,7 @@ public class ExplorersCompassScreen extends Screen {
 			ExplorersCompassConfig.adjustRowsToFitView = !ExplorersCompassConfig.adjustRowsToFitView;
 			ExplorersCompassConfig.saveClient();
 			remove(selectionList);
-			selectionList = new StructureSearchList(this, client, player, selectedId, 130, 40, width - 130 - SCROLLBAR_WIDTH, height - 50, 50);
+			selectionList = new StructureSearchList(this, client, player, selectedId, 130, 40, width - 130 - StructureSearchList.SCROLLBAR_WIDTH, height - 50, 50);
 			filterScroll = MathHelper.clamp(filterScroll, 0, filterMaxScroll());
 			updateSettingsButtonLabels();
 		}));
